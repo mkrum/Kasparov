@@ -46,7 +46,7 @@ class Node(object):
     
     wins = 0
     visits = 0
-
+    losses = 0 
     def __init__(self, board, next_player, parent=None, move=None):
         self.move = move
         self.parent = parent
@@ -73,32 +73,42 @@ class Node(object):
         '''
         Update visit and win counts for previous nodes
         '''
-        if winner is not None:
-            self.visits += 1
+        self.visits += 1
 
-            if winner == self.owner:
-                self.wins += 1
+        if winner == self.owner:
+            self.wins += 1
+        elif winner == self.next_player:
+            self.losses += 1
 
-            if self.parent:
-                self.parent.backprop(winner)
-        else:
-            winner = check_win(self.board)
-            if winner:
-                self.backprop(winner)
-    
+        if self.parent:
+            self.parent.backprop(winner)
+
+
     def rollout(self):
+        winner = check_win(self.board)
+
+        if winner is not None:
+            return winner
+        else:
+            return np.random.choice(self.children).rollout()
+
+    def expand(self, child):
+        rollout_winner = child.rollout()
+        child.backprop(rollout_winner)
+
+    def select(self):
         winner = check_win(self.board)
 
         if winner is not None:
             self.backprop(winner)
         else:
             unexplored_children = [ c for c in self.children if c.visits == 0 ]
-            
+             
             if unexplored_children:
-                np.random.choice(unexplored_children).rollout()
+                self.expand(np.random.choice(unexplored_children))        
             else:
                 next_node = self.uct_select()
-                next_node.rollout()
+                next_node.select()
 
     def uct_select(self):
         total_visits = sum([ c.visits for c in self.children ])
@@ -107,18 +117,18 @@ class Node(object):
         return self.children[uct_score.index(max(uct_score))]
 
     def next_move(self):
-        visits = [ c.visits for c in self.children ]
-        return self.children[ visits.index(max(visits))].move
+        win_ratio = [ c.visits for c in self.children ]
+        return self.children[ win_ratio.index(max(win_ratio))].move
 
 
-def evaluate(board, player):
+def evaluate(board, next_player):
     '''
     Board evaluation function using MCTS
     '''
-    tree = Node(copy.copy(board), player)
+    tree = Node(copy.copy(board), next_player)
      
-    for _ in range(100):
-        tree.rollout()
+    for _ in range(5000):
+        tree.select()
 
     return tree.next_move()
 

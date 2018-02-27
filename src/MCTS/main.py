@@ -31,7 +31,8 @@ def play_user():
         print(board)
         
         if pid == 2:
-            x, y = evaluate(board, pid)
+            r_board = game.get_board_raw()
+            x, y = evaluate(r_board, pid)
         else:
             x = int(input('x: '))
             y = int(input('y: '))
@@ -47,7 +48,7 @@ if __name__ == '__main__':
 
     wins = {0: 0, 1: 0, 2: 0}
     
-    for _ in range(10):
+    for _ in range(1):
         game = TicTacToe()
         
         pid = np.random.random_integers(low=1, high=2, size=1)[0]
@@ -60,7 +61,7 @@ if __name__ == '__main__':
                 x, y = random_choice(board)
             else:
                 r_board = game.get_board_raw()
-                x, y = evaluate(r_board, pid)
+                x, y = evaluate(r_board, (pid % 2) + 1)
 
             game.place(pid, x, y)
 
@@ -72,8 +73,3 @@ if __name__ == '__main__':
 
     print('Wins: %d Ties: %d Losses: %d' % (wins[2], wins[0], wins[1]))
     play_user()
-
-
-
-
-
