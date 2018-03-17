@@ -54,21 +54,14 @@ class Node(object):
         self.next_player = next_player
         self.owner = (next_player % 2) + 1
 
-        self.generate_children(next_player)
-
-    def generate_children(self, pid):
-        ''' Generate all first degree children of a 
-            board
-        '''
-        moves = get_possible_moves(self.board)
-       
+        self.unexplored = get_possible_moves(self.board)
         self.children = []
-        for x, y in moves:
-            new_board = copy.copy(self.board)
-            new_board[x, y] = pid
 
-            self.children.append(Node(new_board, self.owner, self, (x, y)))
-    
+    def construct_node(self, x, y):
+        new_board = copy.copy(self.board)
+        new_board[x, y] = self.next_player
+        return Node(new_board, self.owner, self, (x, y))
+
     def backprop(self, winner):
         '''
         Update visit and win counts for previous nodes
@@ -90,7 +83,7 @@ class Node(object):
         if winner is not None:
             return winner
         else:
-            return np.random.choice(self.children).rollout()
+            self.select()
 
     def expand(self, child):
         rollout_winner = child.rollout()
@@ -102,10 +95,14 @@ class Node(object):
         if winner is not None:
             self.backprop(winner)
         else:
-            unexplored_children = [ c for c in self.children if c.visits == 0 ]
-             
-            if unexplored_children:
-                self.expand(np.random.choice(unexplored_children))        
+            if len(self.unexplored) > 0:
+                new_move = np.random.choice(range(len(self.unexplored)))
+                x, y = self.unexplored[new_move]
+                self.unexplored.pop(new_move)
+
+                new_child = self.construct_node(x, y)
+                self.children.append(new_child)
+                self.expand(self.children[-1])
             else:
                 next_node = self.uct_select()
                 next_node.select()
@@ -127,7 +124,7 @@ def evaluate(board, next_player):
     '''
     tree = Node(copy.copy(board), next_player)
      
-    for _ in range(5000):
+    for _ in range(100):
         tree.select()
 
     return tree.next_move()
