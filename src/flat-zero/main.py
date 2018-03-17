@@ -180,8 +180,8 @@ while True:
     if winner != 0:
         loser = (winner % 2) + 1
 
-        winner_rewards = decay_reward(1, len(inputs[winner]))
-        loser_rewards = decay_reward(-1, len(inputs[loser]))
+        winner_rewards = [1] * len(inputs[winner])
+        loser_rewards =  [-1] * len(inputs[loser])
 
         rewards = np.array(winner_rewards + loser_rewards)
 
@@ -194,8 +194,8 @@ while True:
             
     else:
         #tie
-        one_rewards = decay_reward(-.5, len(inputs[1]))
-        two_rewards = decay_reward(-.5, len(inputs[2]))
+        one_rewards = [-.5] * len(inputs[1])
+        two_rewards = [-.5] * len(inputs[2])
 
         rewards = np.array(one_rewards + two_rewards)
 
