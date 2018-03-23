@@ -4,7 +4,7 @@ import chess
 def play_game():
     board = chess.Board()
 
-    while not board.is_game_over():
+    while not board.is_game_over(claim_draw=True):
         move = random.choice(list(board.legal_moves))
         board.push(move)
 
