@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import random
 import chess
 import copy
@@ -7,9 +9,6 @@ import os
 from util import get_input
 import numpy as np
 from model import DQN
-
-engine = chess.uci.popen_engine(os.environ['SFSH'])
-engine.uci()
 
 def build_input(boards):
     size = len(boards)
@@ -31,7 +30,6 @@ def q_select(boards, model):
     
     curr_board = boards[-1]
     possible = list(curr_board.legal_moves)
-    print(len(possible))
     
     max_val = -1 * float('inf')
     for move in possible:
@@ -49,14 +47,16 @@ def q_select(boards, model):
 
 def test_random(model, size=10):
     wins = 0
-    draw = 0
+    draws = 0
     for i in range(size):
         print('{}/{}'.format(i + 1, size), end='\r')
         board = chess.Board()
         boards = []
         player = 1
-
+        n = 1
         while not board.is_game_over(claim_draw=True):
+            print(n)
+            n += 1
 
             if player == 1:
                 move = q_select(boards, model)
@@ -73,8 +73,8 @@ def test_random(model, size=10):
         if res == '1-0':
             wins += 1
         else:
-            draw += 1
-    print('Wins: {} Draws: {} Losses: '.format(wins, draws, N - (wins + draws)))
+            draws += 1
+    print('Wins: {} Draws: {} Losses: {}'.format(wins, draws, size - (wins + draws)))
 
 def play_game(model):
     board = chess.Board()
@@ -107,7 +107,9 @@ def play_game(model):
 
 def main():
     model = DQN()
-    while True:
+    test_random(model, 1)
+    exit()
+    for _ in range(2):
 
         for i in range(100):
             print('{}/100'.format(i + 1), end='\r')
@@ -118,4 +120,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    engine.quit()
