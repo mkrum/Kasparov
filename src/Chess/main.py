@@ -76,15 +76,17 @@ def test_random(model, size=10):
             draw += 1
     print('Wins: {} Draws: {} Losses: '.format(wins, draws, N - (wins + draws)))
 
-def play_game(model):
+def play_game(model, gamma):
     board = chess.Board()
     player = 1
 
     boards = []
-
     while not board.is_game_over(claim_draw=True):
-
-        move = q_select(boards, model)
+        
+        if random.random() > gamma:
+            move = q_select(boards, model)
+        else:
+            move = random.choice(list(board.legal_moves))
 
         player = (player % 2) + 1
 
@@ -107,13 +109,13 @@ def play_game(model):
 
 def main():
     model = DQN()
+    gamma = 1.0
     while True:
-
         for i in range(100):
             print('{}/100'.format(i + 1), end='\r')
-            inp, reward = play_game(model)
+            inp, reward = play_game(model, gamma)
             model.train(inp, reward)
-
+        gamma *= .9
         test_random(model, 2)
 
 if __name__ == '__main__':
