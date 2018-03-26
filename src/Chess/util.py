@@ -88,7 +88,7 @@ def get_depth(boards, square, constants):
     depth = [0] * DEPTH_SIZE
     cur = boards[-1]
 
-    for board in boards:
+    for board in boards[-8:]:
         b = board if cur.turn else board.mirror()
         piece = b.piece_at(square)
 
