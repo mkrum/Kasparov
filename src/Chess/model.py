@@ -50,8 +50,6 @@ class DQN(object):
         return self.sess.run(self._estimate, feed_dict={self.states: boards})
 
     def train(self, boards, rewards):
-        print(self.sess.run(self.print_loss, 
-                             feed_dict={self.states: boards, self.rewards: rewards}))
         self.sess.run(self._optimizer,
                              feed_dict={self.states: boards, self.rewards: rewards})
 

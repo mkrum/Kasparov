@@ -53,10 +53,7 @@ def test_random(model, size=10):
         board = chess.Board()
         boards = []
         player = 1
-        n = 1
         while not board.is_game_over(claim_draw=True):
-            print(n)
-            n += 1
 
             if player == 1:
                 move = q_select(boards, model)
