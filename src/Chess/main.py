@@ -121,16 +121,16 @@ class GameThread(threading.Thread):
 
 def main():
     model = DQN()
-    gamma = .95
-    epoch = 20
+    gamma = 1.0
+    epoch = 100
     for _ in range(1):
         for i in range(epoch):
             print('{}/{}'.format(i + 1, epoch), end='\r')
             inp, reward = play_game(model, gamma)
             model.train(inp, reward)
         gamma *= .9
-        #test_random(model, 2)
-
+        test_random(model, 2)
+    test_random(model, 100)
 
 
 def main_multithreaded():
@@ -157,9 +157,9 @@ def main_multithreaded():
         for thread in threads:
             thread.join()
 
-        #gamma *= .9
-    #test_random(model, 10)
+        gamma *= .9
+    test_random(model, 10)
 
 
 if __name__ == '__main__':
-    main_multithreaded()
+    main()
