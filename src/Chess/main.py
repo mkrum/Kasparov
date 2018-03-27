@@ -4,6 +4,7 @@ import random
 import chess
 import copy
 import threading
+import multiprocessing
 
 import chess.uci
 import os
@@ -108,38 +109,57 @@ def play_game(model, gamma):
 class GameThread(threading.Thread):
 
     def __init__(self, model, gamma):
+        threading.Thread.__init__(self)
         self.model = model
         self.gamma = gamma
+        self.finished = True
 
     def run(self):
-        self.inp, self.reward = play_game(self.model, self.gamma)
-
+        inp, reward = play_game(self.model, self.gamma)
+        self.model.train(inp, reward)
+        self.finished = False
 
 def main():
     model = DQN()
-    gamma = 1.0
-
-    THREADS = 5
-    for _ in range(5):
-        threads = []
-        for i in range(20):
-            print(i)
-            for _ in range(THREADS):
-                tmp_thread = GameThread(model, gamma)
-                tmp_thread.start()
-                threads.append(tmp_thread)
-
-            for thread in threads:
-                thread.join()
-
-            for thread in threads:
-                model.train(thread.inp, thread.reward)
-
-            print('{}/100'.format(i + 1), end='\r')
-
+    gamma = .95
+    epoch = 20
+    for _ in range(1):
+        for i in range(epoch):
+            print('{}/{}'.format(i + 1, epoch), end='\r')
+            inp, reward = play_game(model, gamma)
+            model.train(inp, reward)
         gamma *= .9
-    test_random(model, 10)
+        #test_random(model, 2)
+
+
+
+def main_multithreaded():
+    model = DQN()
+    gamma = .95
+
+    n = 0
+    for _ in range(1):
+        threads = []
+
+        for i in range(4):
+            threads.append(GameThread(model, gamma))
+            threads[-1].start()
+
+        while n < 20:
+            for i, thread in enumerate(threads):
+                if thread.finished and n < 20:
+                    print('{}/20'.format(n + 1), end='\r')
+                    n += 1
+                    thread.join()
+                    threads[i] = GameThread(model, gamma)
+                    threads[i].start()
+
+        for thread in threads:
+            thread.join()
+
+        #gamma *= .9
+    #test_random(model, 10)
 
 
 if __name__ == '__main__':
-    main()
+    main_multithreaded()
