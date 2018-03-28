@@ -4,7 +4,10 @@ import random
 import chess
 import copy
 import threading
-import multiprocessing
+import multiprocessing as mp
+import argparse
+import sys
+import time
 
 import chess.uci
 import os
@@ -75,7 +78,10 @@ def test_random(model, size=10):
             draws += 1
     print('Wins: {} Draws: {} Losses: {}'.format(wins, draws, size - (wins + draws)))
 
-def play_game(model, gamma):
+def play_game(gamma):
+
+    model = DQN()
+
     board = chess.Board()
     player = 1
 
@@ -99,67 +105,101 @@ def play_game(model, gamma):
     elif res == '0-1':
         rewards = [ -1 if (i % 2) == 0 else 1 for i in range(len(boards)) ]
     else:
-        rewards = [ -.5 for i in range(len(boards)) ]
+        rewards = [ 0 for i in range(len(boards)) ]
     
     inp = build_input(boards)
     rewards = np.expand_dims(np.array(rewards).T, 1)
 
     return inp, rewards
 
-class GameThread(threading.Thread):
 
-    def __init__(self, model, gamma):
-        threading.Thread.__init__(self)
-        self.model = model
-        self.gamma = gamma
-        self.finished = True
+def chess_worker(connection, gamma):
+    while True:
+        gamma = .5
+        board = chess.Board()
+        player = 1
 
-    def run(self):
-        inp, reward = play_game(self.model, self.gamma)
-        self.model.train(inp, reward)
-        self.finished = False
+        boards = []
+        while not board.is_game_over(claim_draw=True):
 
-def main():
+            if random.random() > gamma:
+
+                connection.send({'type': 'board', 'boards': boards[-8:]})
+                move = connection.recv()
+            else:
+                move = random.choice(list(board.legal_moves))
+
+            player = (player % 2) + 1
+
+            board.push(move)
+            boards.append(copy.copy(board))
+            if len(boards) > 8:
+                boards.pop(0)
+
+        res = board.result()
+
+        if res == '1-0':
+            rewards = [ 1 if (i % 2) == 0 else -1 for i in range(len(boards)) ]
+        elif res == '0-1':
+            rewards = [ -1 if (i % 2) == 0 else 1 for i in range(len(boards)) ]
+        else:
+            rewards = [ 0 for i in range(len(boards)) ]
+        
+        inp = build_input(boards)
+        rewards = np.expand_dims(np.array(rewards).T, 1)
+
+        connection.send({'type': 'data', 'inp': inp, 'rewards': rewards})    
+
+
+def main(args):
+
     model = DQN()
     gamma = 1.0
-    epoch = 100
-    for _ in range(1):
-        for i in range(epoch):
-            print('{}/{}'.format(i + 1, epoch), end='\r')
-            inp, reward = play_game(model, gamma)
-            model.train(inp, reward)
-        gamma *= .9
-        test_random(model, 2)
-    test_random(model, 100)
+    for it in range(args.iter):
+
+        conns = []
+        processes = []
+
+        for p in range(args.threads):
+            parent_conn, child_conn = mp.Pipe()
+            conns.append(parent_conn)
+            processes.append(mp.Process(target=chess_worker, args=(child_conn, gamma)))
+            processes[-1].start()
+        
+        games = 0
+        done = []
+        while games < args.epoch:
+            for conn in conns:
+
+                if conn.poll(timeout=1):
+                    msg = conn.recv()
+
+                    if msg['type'] == 'data':
+                        model.train(msg['inp'], msg['rewards'])
+                            
+                        games += 1
+                        print(games)
+
+                    elif msg['type'] == 'board':
+                        conn.send(q_select(msg['boards'], model))
+
+        for p in processes:
+            p.terminate()
+            p.join()
 
 
-def main_multithreaded():
-    model = DQN()
-    gamma = .95
-
-    n = 0
-    for _ in range(1):
-        threads = []
-
-        for i in range(4):
-            threads.append(GameThread(model, gamma))
-            threads[-1].start()
-
-        while n < 20:
-            for i, thread in enumerate(threads):
-                if thread.finished and n < 20:
-                    print('{}/20'.format(n + 1), end='\r')
-                    n += 1
-                    thread.join()
-                    threads[i] = GameThread(model, gamma)
-                    threads[i].start()
-
-        for thread in threads:
-            thread.join()
-
-        gamma *= .9
-    test_random(model, 10)
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Specify the training setup.')
+    parser.add_argument('--threads', metavar='t', type=int, default=1,
+                    help='Number of threads.')
+    parser.add_argument('--iter', metavar='i', type=int, default=1,
+                    help='Number of iterations')
+    parser.add_argument('--epoch', metavar='e', type=int, default=100,
+                    help='Size of each epoch')
+    parser.add_argument('--quiet', dest='quiet', action='store_const',
+                        const=True, default=False, help='Display training progress')
+    args = parser.parse_args()
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+    main(args)

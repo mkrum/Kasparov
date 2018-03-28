@@ -1,12 +1,11 @@
-
+import os.path
 import tensorflow as tf
 
 class DQN(object):
 
-    sess = tf.Session()
-
-
     def __init__(self):
+
+        self.sess = tf.Session()
         features = [64, 64, 32]
         fcneurons = [32, 32, 1]
         self.rewards = tf.placeholder(tf.float32, [None, 1])
@@ -59,8 +58,12 @@ class DQN(object):
         self.saver.save(self.sess, path)
 
     def load(self, path='.modelprog'):
-        self.saver = tf.train.import_meta_graph('{}.meta'.format(path))
-        self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
+        if os.path.exists('{}.meta'.format(path)):
+            new_graph = tf.Graph()
+            self.sess = tf.Session(graph=new_graph)
+            self.saver = tf.train.import_meta_graph('{}.meta'.format(path))
+            self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
+
 
 
 
