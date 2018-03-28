@@ -1,6 +1,7 @@
 import collections
 import numpy as np
 import chess
+import chess.pgn
 
 SIZE = 8
 DEPTH_SIZE = 105
@@ -101,6 +102,19 @@ def get_depth(boards, square, constants):
 
     return np.array(depth[-DEPTH_SIZE:])
 
+def to_pgn(board):
+    '''
+    Converts a board to a PGN file
+    '''
+
+    game = chess.pgn.Game()
+    moves = list(board.move_stack)
+    node = game.add_variation(moves[0])
+
+    for i in range(1, len(moves)):
+        node = node.add_variation(moves[i])
+
+    print(game, file=open("model.pgn", "w"), end="\n\n")
 
 def main():
     boards = []
