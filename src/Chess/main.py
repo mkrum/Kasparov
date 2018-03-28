@@ -115,7 +115,6 @@ def play_game(gamma):
 
 def chess_worker(connection, gamma):
     while True:
-        gamma = .5
         board = chess.Board()
         player = 1
 
@@ -156,6 +155,8 @@ def main(args):
     model = DQN()
     gamma = 1.0
     for it in range(args.iter):
+        f = open(str(it), 'w')
+        f.close()
 
         conns = []
         processes = []
@@ -171,7 +172,7 @@ def main(args):
         while games < args.epoch:
             for conn in conns:
 
-                if conn.poll(timeout=1):
+                if conn.poll():
                     msg = conn.recv()
 
                     if msg['type'] == 'data':
@@ -188,7 +189,10 @@ def main(args):
             p.terminate()
             p.join()
 
+        gamma *= .9
 
+    test_random(model, 10)
+    model.save()
 
 
 if __name__ == '__main__':

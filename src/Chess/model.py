@@ -54,10 +54,10 @@ class DQN(object):
         self.sess.run(self._optimizer,
                              feed_dict={self.states: boards, self.rewards: rewards})
 
-    def save(self, path='.modelprog'):
+    def save(self, path='./.modelprog'):
         self.saver.save(self.sess, path)
 
-    def load(self, path='.modelprog'):
+    def load(self, path='./.modelprog'):
         if os.path.exists('{}.meta'.format(path)):
             new_graph = tf.Graph()
             self.sess = tf.Session(graph=new_graph)
