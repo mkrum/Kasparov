@@ -178,7 +178,8 @@ def main(args):
                         model.train(msg['inp'], msg['rewards'])
                             
                         games += 1
-                        print(games)
+                        if not args.quiet:
+                            print('{}/{}'.format(games, args.epoch), end='\r')
 
                     elif msg['type'] == 'board':
                         conn.send(q_select(msg['boards'], model))
