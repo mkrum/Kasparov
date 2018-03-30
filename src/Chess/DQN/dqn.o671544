@@ -1,0 +1,5 @@
+The module gcc/4.9.2 has been deprecated and will be removed in May 2018.  Please switch to the current version or email crcsupport@nd.edu for help.
+RuntimeError: module compiled against API version 0xc but this version of numpy is 0xa
+RuntimeError: module compiled against API version 0xc but this version of numpy is 0xa
+Loading .modelprog
+1/102/103/104/105/106/107/108/109/1010/10Wins: 2 Draws: 8 Losses: 0
