@@ -3,7 +3,6 @@ import numpy as np
 import chess
 
 SIZE = 8
-DEPTH_SIZE = 105
 STEP = 8
 
 # encoding for a square that contains a piece
@@ -23,14 +22,15 @@ ONEHOT = {
     }
 
 
-def get_input(boards):
-    ''' return the 8x8x105 representation of the game state '''
-    inp = np.zeros((SIZE, SIZE, DEPTH_SIZE), dtype=np.int16)
+def get_input(boards, history):
+    ''' returns the representation of the game state '''
+    depth_size = 12 * history + 9
+    inp = np.zeros((SIZE, SIZE, depth_size), dtype=np.int16)
     constants = get_constants(boards[-1])
     for i in range(SIZE):
         for j in range(SIZE):
             square = chess.square(i, j)
-            inp[i][j] = get_depth(boards, square, constants)
+            inp[i][j] = get_depth(boards, square, constants, depth_size, history)
 
     return inp
 
@@ -72,8 +72,11 @@ def get_repetitions(board):
 def get_constants(board):
     '''color, total move count, castling, no-progress count, and repetitions'''
     constants = [board.turn, board.fullmove_number]
-    p1_castling = [0, 0]
-    p2_castling = [0, 0]
+    b = board if board.turn else board.mirror()
+    p1_castling = [int(b.has_kingside_castling_rights(True)),
+                   int(b.has_queenside_castling_rights(True))]
+    p2_castling = [int(b.has_kingside_castling_rights(False)),
+                   int(b.has_queenside_castling_rights(False))]
     constants.extend(p1_castling)
     constants.extend(p2_castling)
     constants.append(board.halfmove_clock)
@@ -83,12 +86,13 @@ def get_constants(board):
     return constants
 
 
-def get_depth(boards, square, constants):
+
+def get_depth(boards, square, constants, depth_size, history):
     ''' get the 105 length vector for a given row and column '''
-    depth = [0] * DEPTH_SIZE
+    depth = [0] * depth_size
     cur = boards[-1]
 
-    for board in boards:
+    for board in boards[-history:]:
         b = board if cur.turn else board.mirror()
         piece = b.piece_at(square)
 
@@ -99,15 +103,16 @@ def get_depth(boards, square, constants):
 
     depth.extend(constants)
 
-    return np.array(depth[-DEPTH_SIZE:])
+    return np.array(depth[-depth_size:])
 
 
 def main():
     boards = []
     board = chess.Board()
     boards.append(board)
-    inp = get_input(boards)
+    inp = get_input(boards, 1)
     print(inp)
+    print(inp.shape)
 
 
 if __name__ == '__main__':
