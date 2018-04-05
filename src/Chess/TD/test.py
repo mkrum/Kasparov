@@ -12,19 +12,10 @@ import time
 
 import chess.uci
 import os
-from util import get_input
+from util import get_input, to_pgn
 import numpy as np
 from model import DQN
 
-def to_pgn(board):
-    game = chess.pgn.Game()
-    moves = list(board.move_stack)
-    node = game.add_variation(moves[0])
-
-    for i in range(1, len(moves)):
-        node = node.add_variation(moves[i])
-
-    print(game, file=open("model.pgn", "w"), end="\n\n")
 
 
 def build_input(boards):
@@ -88,16 +79,8 @@ def main():
 
         res = board.result()
 
-
+        print(res)
         to_pgn(board)
-        exit()
-        if res == '1-0':
-            to_pgn(board)
-            exit()
-        elif res == '0-1':
-            print('loss')
-        else:
-            print('loss/draw, trying again')
         
 
 
