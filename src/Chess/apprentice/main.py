@@ -50,93 +50,45 @@ def q_select(boards, model):
 
     return max_move
 
-def test_random(model, size=10):
-    wins = 0
-    draws = 0
-    for i in range(size):
-        print('{}/{}'.format(i + 1, size), end='\r')
-        board = chess.Board()
-        boards = []
-        player = 1
-        while not board.is_game_over(claim_draw=True):
 
-            if player == 1:
-                move = q_select(boards, model)
-            else:
-                move = random.choice(list(board.legal_moves))
+def chess_worker(connection):
 
-            player = (player % 2) + 1
+    engine = chess.uci.popen_engine(os.environ['SFSH'])
+    engine.uci() 
 
-            board.push(move)
-            boards.append(copy.copy(board))
-
-        res = board.result()
-
-        if res == '1-0':
-            wins += 1
-        else:
-            draws += 1
-    print('Wins: {} Draws: {} Losses: {}'.format(wins, draws, size - (wins + draws)))
-
-def play_game(gamma):
-
-    model = DQN()
-
-    board = chess.Board()
-    player = 1
-
-    boards = []
-    while not board.is_game_over(claim_draw=True):
-        
-        if random.random() > gamma:
-            move = q_select(boards, model)
-        else:
-            move = random.choice(list(board.legal_moves))
-
-        player = (player % 2) + 1
-
-        board.push(move)
-        boards.append(copy.copy(board))
-
-    res = board.result()
-
-    if res == '1-0':
-        rewards = [ 1 if (i % 2) == 0 else -1 for i in range(len(boards)) ]
-    elif res == '0-1':
-        rewards = [ -1 if (i % 2) == 0 else 1 for i in range(len(boards)) ]
-    else:
-        rewards = [ 0 for i in range(len(boards)) ]
-    
-    inp = build_input(boards)
-    rewards = np.expand_dims(np.array(rewards).T, 1)
-
-    return inp, rewards
-
-
-def chess_worker(connection, gamma):
     while True:
         board = chess.Board()
         player = 1
 
-        boards = []
+        boards = [copy.copy(board)]
         while not board.is_game_over(claim_draw=True):
 
-            if random.random() > gamma:
+            engine.position(board)
+            move, _ = engine.go()
+            
+            for pos_move in list(board.legal_moves):
 
-                connection.send({'type': 'board', 'boards': boards[-8:]})
-                move = connection.recv()
-            else:
-                move = random.choice(list(board.legal_moves))
+                t_boards = copy.deepcopy(boards)
+                t_curr = copy.copy(t_boards[-1])
+                t_curr.push(pos_move)
+                t_boards.append(t_curr)
 
-            player = (player % 2) + 1
+                if pos_move == move:
+                    rewards = [1]
+                else:
+                    rewards = [0]
+
+                rewards = np.expand_dims(np.array(rewards).T, 1)
+                connection.send({'type': 'data', 'inp': build_input(t_boards), 'rewards': rewards})    
 
             board.push(move)
-            boards.append(copy.copy(board))
             if len(boards) > 8:
                 boards.pop(0)
 
-        res = board.result()
+            boards.append(copy.copy(board))
 
+        connection.send({'type': 'end'})    
+        '''
         if res == '1-0':
             rewards = [ 1 if (i % 2) == 0 else -1 for i in range(len(boards)) ]
         elif res == '0-1':
@@ -146,14 +98,16 @@ def chess_worker(connection, gamma):
         
         inp = build_input(boards)
         rewards = np.expand_dims(np.array(rewards).T, 1)
-
-        connection.send({'type': 'data', 'inp': inp, 'rewards': rewards})    
+        '''
 
 
 def main(args):
-
     model = DQN()
-    gamma = 1.0
+
+    if args.load is not None:
+        print('Loading {}'.format(args.load))
+        model.load(args.load)
+
     for it in range(args.iter):
         f = open(str(it), 'w')
         f.close()
@@ -164,7 +118,7 @@ def main(args):
         for p in range(args.threads):
             parent_conn, child_conn = mp.Pipe()
             conns.append(parent_conn)
-            processes.append(mp.Process(target=chess_worker, args=(child_conn, gamma)))
+            processes.append(mp.Process(target=chess_worker, args=(child_conn, )))
             processes[-1].start()
         
         games = 0
@@ -177,34 +131,39 @@ def main(args):
 
                     if msg['type'] == 'data':
                         model.train(msg['inp'], msg['rewards'])
-                            
+
+                    elif msg['type'] == 'end':
                         games += 1
                         if not args.quiet:
                             print('{}/{}'.format(games, args.epoch), end='\r')
-
-                    elif msg['type'] == 'board':
-                        conn.send(q_select(msg['boards'], model))
 
         for p in processes:
             p.terminate()
             p.join()
 
-        gamma *= .9
-
-    test_random(model, 10)
-    model.save()
-
+        model.save()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Specify the training setup.')
+
     parser.add_argument('--threads', metavar='t', type=int, default=1,
                     help='Number of threads.')
+
     parser.add_argument('--iter', metavar='i', type=int, default=1,
                     help='Number of iterations')
+
     parser.add_argument('--epoch', metavar='e', type=int, default=100,
                     help='Size of each epoch')
+
     parser.add_argument('--quiet', dest='quiet', action='store_const',
-                        const=True, default=False, help='Display training progress')
+                        const=True, default=False, help='Repress progress output')
+
+    parser.add_argument('--load', metavar='e', type=str, default=None,
+                    help='Load a pre existing file')
+
+    parser.add_argument('--gamma', metavar='e', type=float, default=1.0,
+                    help='Exploration parameter')
+
     args = parser.parse_args()
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
     main(args)

@@ -32,7 +32,7 @@ def get_input(boards):
             square = chess.square(i, j)
             inp[i][j] = get_depth(boards, square, constants)
 
-    return np.expand_dims(inp, 0)
+    return inp
 
 
 def get_repetitions(board):
@@ -88,7 +88,7 @@ def get_depth(boards, square, constants):
     depth = [0] * DEPTH_SIZE
     cur = boards[-1]
 
-    for board in boards[-8:]:
+    for board in boards:
         b = board if cur.turn else board.mirror()
         piece = b.piece_at(square)
 
@@ -106,8 +106,7 @@ def main():
     boards = []
     board = chess.Board()
     boards.append(board)
-    #inp = get_input(board.move_stack)
-    print(board.move_stack)
+    inp = get_input(boards)
     print(inp)
 
 

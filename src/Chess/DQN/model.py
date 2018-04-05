@@ -59,8 +59,6 @@ class DQN(object):
 
     def load(self, path='./.modelprog'):
         if os.path.exists('{}.meta'.format(path)):
-            new_graph = tf.Graph()
-            self.sess = tf.Session(graph=new_graph)
             self.saver = tf.train.import_meta_graph('{}.meta'.format(path))
             self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
 
