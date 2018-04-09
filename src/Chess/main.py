@@ -58,16 +58,16 @@ def main(args):
                     if msg['type'] == 'data':
                         losses.append(model.train(msg['inp'], msg['rewards']))
                             
-                        games += 1
-                        if not args.quiet:
-                            print('{}/{}'.format(games, args.epoch), end='\r')
-
                     elif msg['type'] == 'board':
                         conn.send(select(msg['boards'], model, args.history))
 
                     elif msg['type'] == 'eval':
                         conn.send(model.evaluate(get_input(msg['boards'], args.history)))
 
+                    elif msg['type'] == 'end':
+                        games += 1
+                        if not args.quiet:
+                            print('{}/{}'.format(games, args.epoch), end='\r')
 
         for p in processes:
             p.terminate()
@@ -124,6 +124,8 @@ if __name__ == '__main__':
         from temporal import *
     elif args.model == 'dqn':
         from dqn import *
+    elif args.model == 'app':
+        from apprentice import *
     else:
         print('Model not found: {}'.format(args.model))
         exit()
