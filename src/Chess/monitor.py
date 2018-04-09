@@ -45,9 +45,11 @@ def get_current_data(path):
         val = read_iteration(path + '/' + str(it))
         if val:
             vals.append(val)
+        else:
+            print('Currently Testing...')
 
-
-    if len(iterations) > 1:
+        
+    if len(vals) >= 1:
         best_loss = min( [x[1] for x in vals] )
 
         current_iteration = iterations[-1]
@@ -67,7 +69,6 @@ if __name__ == '__main__':
             if not check_finished(x):
                 print(x.split('/')[-1])
                 settings = read_settings(x + '/settings.txt')
-                get_current_data(x)
                 
                 info = ['model', 'epoch', 'gamma', 'decay', 'history', 'threads']
                 for val in info:
@@ -95,5 +96,6 @@ if __name__ == '__main__':
                     for val in [curr_loss, best_loss, curr_gamma, curr_time]:
                         print('{0:>10}'.format(round(val, 4)), end='')
                     print()
+                print()
                               
         time.sleep(1)

@@ -11,31 +11,31 @@ from util import build_input, get_input
 class DQN(object):
 
     def __init__(self):
-
+        N = 2
         self.sess = tf.Session()
-        features = [64, 64, 32]
-        fcneurons = [32, 32, 1]
+        features = [128, 64, 64]
+        fcneurons = [512, 256, 1]
         self.rewards = tf.placeholder(tf.float32, [None, 1])
-        self.states = tf.placeholder(tf.float32, [None, 8, 8, 105])
+        self.states = tf.placeholder(tf.float32, [None, 8, 8, 12 * N + 9])
 
         conv1 = tf.layers.conv2d(
                     inputs=self.states,
                     filters=features[0],
-                    kernel_size=[2, 2],
+                    kernel_size=[4, 4],
                     padding='same',
                     activation=tf.nn.relu)
 
         conv2 = tf.layers.conv2d(
                     inputs=conv1,
                     filters=features[1],
-                    kernel_size=[2, 2],
+                    kernel_size=[4, 4],
                     padding='same',
                     activation=tf.nn.relu)
 
         conv3 = tf.layers.conv2d(
                     inputs=conv2,
                     filters=features[2],
-                    kernel_size=[2, 2],
+                    kernel_size=[4, 4],
                     padding='same',
                     activation=tf.nn.relu)
 
@@ -43,13 +43,13 @@ class DQN(object):
 
         fc1 = tf.layers.dense(inputs=conv_flatten, units=fcneurons[0], activation=tf.nn.relu)
         fc2 = tf.layers.dense(inputs=fc1, units=fcneurons[1], activation=tf.nn.relu)
-
         self._estimate = tf.layers.dense(inputs=fc2, units=fcneurons[2], activation=tf.nn.tanh)
 
         self._loss = tf.squared_difference(self._estimate, self.rewards)
+        self._av_loss = tf.reduce_mean(self._loss)
         self.print_loss = tf.reduce_mean(tf.squared_difference(self._estimate, self.rewards))
 
-        self._optimizer = tf.train.AdamOptimizer(1E-4).minimize(self._loss) 
+        self._optimizer = tf.train.AdagradOptimizer(1E-5).minimize(self._loss) 
         self.sess.run(tf.global_variables_initializer())
 
         self.saver = tf.train.Saver()
@@ -58,8 +58,10 @@ class DQN(object):
         return self.sess.run(self._estimate, feed_dict={self.states: boards})
 
     def train(self, boards, rewards):
-        self.sess.run(self._optimizer,
+        _, loss = self.sess.run([self._optimizer, self._av_loss],
                              feed_dict={self.states: boards, self.rewards: rewards})
+
+        return float(loss)
 
     def save(self, path='./.modelprog'):
         self.saver.save(self.sess, path)
@@ -68,10 +70,6 @@ class DQN(object):
         if os.path.exists('{}.meta'.format(path)):
             self.saver = tf.train.import_meta_graph('{}.meta'.format(path))
             self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
-
-
-
-
 def select(boards, model, history):
     '''
     Simple selection algorithm
@@ -98,6 +96,26 @@ def select(boards, model, history):
 
     return max_move
 
+def select(boards, model, history):
+    if len(boards) == 0:
+        boards.append(chess.Board())
+    
+    curr_board = boards[-1]
+    possible = list(curr_board.legal_moves)
+    
+    min_val = float('inf')
+    for move in possible:
+        t_boards = copy.deepcopy(boards)
+        t_curr = copy.copy(t_boards[-1])
+        t_curr.push(move)
+        t_boards.append(t_curr)
+
+        val = model.evaluate(get_input(t_boards, history))
+        if val < min_val:
+            min_val = val
+            best_move = move
+
+    return best_move
 
 def chess_worker(connection, gamma, history):
     while True:
@@ -108,7 +126,6 @@ def chess_worker(connection, gamma, history):
         while not board.is_game_over(claim_draw=True):
 
             if random.random() > gamma:
-
                 connection.send({'type': 'board', 'boards': boards[-8:]})
                 move = connection.recv()
             else:
@@ -116,8 +133,9 @@ def chess_worker(connection, gamma, history):
 
             player = (player % 2) + 1
 
-            board.push(move)
             boards.append(copy.copy(board))
+            board.push(move)
+
             if len(boards) > 8:
                 boards.pop(0)
 
@@ -134,4 +152,5 @@ def chess_worker(connection, gamma, history):
         rewards = np.expand_dims(np.array(rewards).T, 1)
 
         connection.send({'type': 'data', 'inp': inp, 'rewards': rewards})    
+        connection.send({'type': 'end'})
 
