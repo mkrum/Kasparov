@@ -63,7 +63,7 @@ def main(args):
                             print('{}/{}'.format(games, args.epoch), end='\r')
 
                     elif msg['type'] == 'board':
-                        conn.send(q_select(msg['boards'], model))
+                        conn.send(select(msg['boards'], model, args.history))
 
                     elif msg['type'] == 'eval':
                         conn.send(model.evaluate(get_input(msg['boards'], args.history)))
@@ -122,6 +122,8 @@ if __name__ == '__main__':
     
     if args.model == 'td':
         from temporal import *
+    elif args.model == 'dqn':
+        from dqn import *
     else:
         print('Model not found: {}'.format(args.model))
         exit()
