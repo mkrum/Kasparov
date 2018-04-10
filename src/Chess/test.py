@@ -45,7 +45,7 @@ def game_worker(connection, args):
                     move = random.choice(list(board.legal_moves))
                 else:
                     engine.position(board)
-                    move = engine.go()
+                    move, _ = engine.go()
 
             player = (player % 2) + 1
 
