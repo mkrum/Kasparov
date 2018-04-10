@@ -14,76 +14,115 @@ import chess.uci
 import os
 from util import get_input, to_pgn
 import numpy as np
-from model import DQN
 
+def find_settings(path):
+    settings_file = open(path + '/settings.txt', 'r')
+    lines = settings_file.read().splitlines()
+    model = lines[7].split()[-1]
+    history = int(lines[-1].split()[-1])
+    return model, history
 
-
-def build_input(boards):
-    size = len(boards)
-    inputs = np.zeros((size, 8, 8, 105))
-
-    for i in range(1, len(boards) + 1):
-        inputs[(i - 1), :, :, :] = get_input(boards[:i])
-
-    return inputs
-
-def q_select(boards, model):
-    '''
-    Simple selection algorithm
-
-    Picks the move on the baord with the highest estimated value 
-    '''
-    if len(boards) == 0:
-        boards.append(chess.Board())
-    
-    curr_board = boards[-1]
-    possible = list(curr_board.legal_moves)
-    
-    max_val = -1 * float('inf')
-    for move in possible:
-        t_boards = copy.deepcopy(boards)
-        t_curr = copy.copy(t_boards[-1])
-        t_curr.push(move)
-        t_boards.append(t_curr)
-
-        val = model.evaluate(get_input(t_boards))
-        if val > max_val:
-            max_val = val
-            max_move = move
-
-    return max_move
-
-
-def main():
-    model = DQN()
-    model.load()
-
+def game_worker(connection, args):
+    #setup stockfish
+    if args.stockfish > -1:
+        engine = chess.uci.popen_engine(os.environ['SFSH'])
+        engine.uci()
+        engine.setoption({'Skill Level': args.stockfish})
+        
     while True:
         board = chess.Board()
         player = 1
 
-        boards = []
+        boards = [copy.deepcopy(board)]
+
         while not board.is_game_over(claim_draw=True):
 
             if player == 1:
-                move = q_select(boards, model)
+                connection.send({'type': 'board', 'boards': boards[-8:]})
+                move = connection.recv()
             else:
-                move = random.choice(list(board.legal_moves))
+                if args.stockfish == -1:
+                    move = random.choice(list(board.legal_moves))
+                else:
+                    engine.position(board)
+                    move = engine.go()
 
             player = (player % 2) + 1
 
             board.push(move)
-            boards.append(copy.copy(board))
+            boards.append(copy.deepcopy(board))
+
             if len(boards) > 8:
                 boards.pop(0)
 
         res = board.result()
+        connection.send({'type': 'end', 'result' : res, 'pgn' : to_pgn(board)})
 
-        print(res)
-        to_pgn(board)
-        
+
+def main(args):
+    model = DQN()
+    model.load(args.path)
+    conns = []
+    processes = []
+    for p in range(args.threads):
+        parent_conn, child_conn = mp.Pipe()
+        conns.append(parent_conn)
+        processes.append(mp.Process(target=game_worker, args=(child_conn, args)))
+        processes[-1].start()
+    
+    games = 0
+    losses = []
+    while games < args.games:
+
+        for conn in conns:
+            if conn.poll():
+                msg = conn.recv()
+
+                if msg['type'] == 'board':
+                    conn.send(select(msg['boards'], model, args.history))
+
+                elif msg['type'] == 'end':
+                    games += 1
+                    print(msg['result'])
+                    print(msg['pgn'])
+
+    for p in processes:
+        p.terminate()
+        p.join()
+
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Specify the training setup.')
+
+    parser.add_argument('--path', metavar='p', type=str, 
+                    help='Path to the model you want to test')
+
+    parser.add_argument('--games', metavar='g', type=int, default=10,
+                    help='Number of games you want to test over')
+
+    parser.add_argument('--threads', metavar='t', type=int, default=1,
+                    help='Number of threads')
+
+    parser.add_argument('--stockfish', metavar='o', type=int, default=-1,
+                    help='Play against specified level of stockfish')
+
+    args = parser.parse_args()
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-    main()
+    
+    model, history = find_settings(args.path)
+    args.history = history
+    args.model = model
+    
+    if args.model == 'td':
+        from temporal import *
+    elif args.model == 'dqn':
+        from dqn import *
+    elif args.model == 'app':
+        from apprentice import *
+    else:
+        print('Model not found: {}'.format(args.model))
+        exit()
+
+    main(args)
