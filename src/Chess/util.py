@@ -22,20 +22,33 @@ ONEHOT = {
     'k': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     }
 
+def to_pgn(board):
+    '''
+    Converts a board object into a pgn file
+    '''
+    game = chess.pgn.Game()
+    moves = list(board.move_stack)
+    node = game.add_variation(moves[0])
+
+    for i in range(1, len(moves)):
+        node = node.add_variation(moves[i])
+
+    return str(game)
 
 
-
-def build_input(boards, history):
+def build_input(boards, rewards, history):
     '''
     Converts a list of boards through time into respective model inputs
     '''
+    
     size = len(boards)
     inputs = np.zeros((size, 8, 8,  12 * history + 9))
 
     for i in range(1, len(boards) + 1):
         inputs[(i - 1), :, :, :] = get_input(boards[:i], history)
-
-    return inputs
+    
+    paritions = np.ceil(float(size)/10.0)
+    return np.array_split(inputs, paritions), np.array_split(rewards, paritions)
 
 def get_input(boards, history):
     ''' returns the representation of the game state '''
