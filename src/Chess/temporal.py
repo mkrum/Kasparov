@@ -12,7 +12,8 @@ class DQN(object):
     def __init__(self):
         N = 2
         self.sess = tf.Session()
-        features = [128, 64, 64]
+
+        features = [64, 128, 256]
         fcneurons = [512, 256, 1]
         self.rewards = tf.placeholder(tf.float32, [None, 1])
         self.states = tf.placeholder(tf.float32, [None, 8, 8, 12 * N + 9])
@@ -48,7 +49,7 @@ class DQN(object):
         self._av_loss = tf.reduce_mean(self._loss)
         self.print_loss = tf.reduce_mean(tf.squared_difference(self._estimate, self.rewards))
 
-        self._optimizer = tf.train.AdagradOptimizer(1E-5).minimize(self._loss) 
+        self._optimizer = tf.train.AdagradOptimizer(1E-4).minimize(self._loss) 
         self.sess.run(tf.global_variables_initializer())
 
         self.saver = tf.train.Saver()
@@ -57,10 +58,14 @@ class DQN(object):
         return self.sess.run(self._estimate, feed_dict={self.states: boards})
 
     def train(self, boards, rewards):
-        _, loss = self.sess.run([self._optimizer, self._av_loss],
-                             feed_dict={self.states: boards, self.rewards: rewards})
+        losses = []
+        for b, r in zip(boards, rewards): 
+            _, loss = self.sess.run([self._optimizer, self._av_loss],
+                                 feed_dict={self.states: b, self.rewards: r})
 
-        return float(loss)
+            losses.append(loss)
+
+        return sum(losses)/len(losses)
 
     def save(self, path='./.modelprog'):
         self.saver.save(self.sess, path)
@@ -70,7 +75,7 @@ class DQN(object):
             self.saver = tf.train.import_meta_graph('{}.meta'.format(path))
             self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
 
-def select(boards, model, history):
+def min_select(boards, model, history):
     if len(boards) == 0:
         boards.append(chess.Board())
     
@@ -91,19 +96,46 @@ def select(boards, model, history):
 
     return best_move
 
+def max_select(boards, model, history):
+    if len(boards) == 0:
+        boards.append(chess.Board())
+    
+    curr_board = boards[-1]
+    possible = list(curr_board.legal_moves)
+    
+    max_val = -1 *float('inf')
+    for move in possible:
+        t_boards = copy.deepcopy(boards)
+        t_curr = copy.copy(t_boards[-1])
+        t_curr.push(move)
+        t_boards.append(t_curr)
+
+        val = model.evaluate(get_input(t_boards, history))
+        if val > max_val:
+            max_val = val
+            best_move = move
+
+    return best_move
+
+def select(boards, model, history):
+    return min_select(boards, model, history)
+
 def chess_worker(connection, gamma, history):
     lam = 0.7
     while True:
         board = chess.Board()
         player = 1
 
-        rel_boards = {1: [], 2: []}
-        vals = {1: [], 2: []}
-        rewards = {1: [], 2: []}
-        boards = []
+        vals = []
+        rewards = []
 
         pid = 1
+        boards = [copy.deepcopy(board)]
         while not board.is_game_over(claim_draw=True):
+
+            connection.send({'type': 'eval', 'boards': boards[-8:]})
+            val = connection.recv()
+            vals.append(val)
 
             if random.random() > gamma:
                 connection.send({'type': 'board', 'boards': boards[-8:]})
@@ -111,17 +143,10 @@ def chess_worker(connection, gamma, history):
             else:
                 move = random.choice(list(board.legal_moves))
 
-            rel_boards[pid].append(board)
-            
-            connection.send({'type': 'eval', 'boards': boards[-8:]})
-            val = connection.recv()
-
-            vals[pid].append(val)
-            rewards[pid].append(0)
-
-            boards.append(copy.copy(board))
+            rewards.append(0)
 
             board.push(move)
+            boards.append(copy.deepcopy(board))
 
             if len(boards) > 8:
                 boards.pop(0)
@@ -129,26 +154,19 @@ def chess_worker(connection, gamma, history):
             pid = (pid % 2 + 1)
 
         res = board.result()
+        if res in ['1-0', '0-1']:
+            rewards[-1] = 1
+            rewards[-2] = -1
 
-        if res == '1-0':
-            rewards[1][-1] = 1
-            rewards[2][-1] = -1
-        elif res == '0-1':
-            rewards[1][-1] = -1
-            rewards[2][-1] = 1
+        targets = []
+        for i in range(len(boards) - 2):
+            targets.append(rewards[i] + vals[i + 2])
 
-        targets = {1: [], 2: []}
+        targets.append(rewards[-2])
+        targets.append(rewards[-1])
 
-        for i in range(len(rewards[1]) - 1):
-            targets[1].append(rewards[1][i] + lam * vals[1][i + 1])
-        targets[1].append(rewards[1][-1])
+        targets = np.expand_dims(np.array(targets), 1)
+        in_boards, in_targets = build_input(boards, targets, history)
 
-        for i in range(len(rewards[2]) - 1):
-            targets[2].append(rewards[2][i] + lam * vals[2][i + 1])
-        targets[2].append(rewards[2][-1])
-
-        inp = build_input(rel_boards[1] + rel_boards[2], history)
-        targets = np.expand_dims(np.array(targets[1] + targets[2]), 1)
-
-        connection.send({'type': 'data', 'inp': inp, 'rewards': targets})    
+        connection.send({'type': 'data', 'inp': in_boards, 'rewards': in_targets})    
         connection.send({'type': 'end'})
