@@ -11,20 +11,8 @@ import time
 
 import chess.uci
 import os
-from util import get_input
+from util import get_input, to_pgn
 
-def to_pgn(board):
-    '''
-    Converts a board object into a pgn file
-    '''
-    game = chess.pgn.Game()
-    moves = list(board.move_stack)
-    node = game.add_variation(moves[0])
-
-    for i in range(1, len(moves)):
-        node = node.add_variation(moves[i])
-
-    return str(game)
 
 def test_random(model, size, history):
     '''
@@ -74,17 +62,21 @@ def main(args):
     gamma = args.gamma
     for it in range(args.iter):
         if it > 0:
-            f = open(args.path + '/' + str(it), 'w')
-            f.write('Gamma: {}\n'.format(gamma))
-            f.write('Average Loss: {}\n'.format(sum(losses) / len(losses)))
-            f.write('Time (Minutes): {}\n'.format(((end - start) / 60)))
-            f.write('\n\n')
-            pgn = test_random(model, 2, args.history)
-            for g in pgn:
-                f.write(g)
-                f.write('\n\n')
 
-            f.close()
+            if not args.debug:
+                f = open(args.path + '/' + str(it), 'w')
+                f.write('Gamma: {}\n'.format(gamma))
+                f.write('Average Loss: {}\n'.format(sum(losses) / len(losses)))
+                f.write('Time (Minutes): {}\n'.format(((end - start) / 60)))
+                f.write('\n\n')
+                '''
+                pgn = test_random(model, 2, args.history)
+                for g in pgn:
+                    f.write(g)
+                    f.write('\n\n')
+
+                '''
+                f.close()
 
         start = time.time()
         conns = []
@@ -114,6 +106,7 @@ def main(args):
                         conn.send(model.evaluate(get_input(msg['boards'], args.history)))
 
                     elif msg['type'] == 'end':
+
                         games += 1
                         if not args.quiet:
                             print('{}/{}'.format(games, args.epoch), end='\r')
@@ -123,21 +116,26 @@ def main(args):
             p.join()
 
         gamma *= args.decay
-        model.save(args.path + '/.modelprog')
+
+        if not args.debug:
+            model.save(args.path + '/.modelprog')
+
         end = time.time()
 
-
-    model.save(args.path + '/.modelprog')
-    f = open(args.path + '/final', 'w')
-    f.write('Gamma: {}\n'.format(gamma))
-    f.write('Average Loss: {}\n'.format(sum(losses) / len(losses)))
-    f.write('\n\n')
-    pgn = test_random(model, 2, args.history)
-    for g in pgn:
-        f.write(g)
+    if not args.debug:
+        model.save(args.path + '/.modelprog')
+        f = open(args.path + '/final', 'w')
+        f.write('Gamma: {}\n'.format(gamma))
+        f.write('Average Loss: {}\n'.format(sum(losses) / len(losses)))
         f.write('\n\n')
+        '''
+        pgn = test_random(model, 2, args.history)
+        for g in pgn:
+            f.write(g)
+            f.write('\n\n')
+        '''
+        f.close()
 
-    f.close()
 
 
 if __name__ == '__main__':
@@ -158,6 +156,9 @@ if __name__ == '__main__':
     parser.add_argument('--quiet', dest='quiet', action='store_const',
                         const=True, default=False, help='Repress progress output')
 
+    parser.add_argument('--debug', dest='debug', action='store_const',
+                        const=True, default=False, help='Repress any saving')
+
     parser.add_argument('--load', metavar='l', type=str, default=None,
                     help='Load a pre existing file')
 
@@ -176,6 +177,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+
     
     if args.model == 'td':
         from temporal import *
@@ -187,11 +189,12 @@ if __name__ == '__main__':
         print('Model not found: {}'.format(args.model))
         exit()
     
-    os.mkdir(args.path)
-    settings_file = open(args.path + '/settings.txt', 'w')
-    for arg in vars(args):
-        settings_file.write('{} {}\n'.format(arg, getattr(args, arg)))
+    if not args.debug:
+        os.mkdir(args.path)
+        settings_file = open(args.path + '/settings.txt', 'w')
+        for arg in vars(args):
+            settings_file.write('{} {}\n'.format(arg, getattr(args, arg)))
 
-    settings_file.close()
+        settings_file.close()
 
     main(args)
