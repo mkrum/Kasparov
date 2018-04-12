@@ -13,6 +13,8 @@ import chess.uci
 import os
 from util import get_input, to_pgn
 
+from shutil import copy2
+
 
 def test_random(model, size, history):
     '''
@@ -69,13 +71,6 @@ def main(args):
                 f.write('Average Loss: {}\n'.format(sum(losses) / len(losses)))
                 f.write('Time (Minutes): {}\n'.format(((end - start) / 60)))
                 f.write('\n\n')
-                '''
-                pgn = test_random(model, 2, args.history)
-                for g in pgn:
-                    f.write(g)
-                    f.write('\n\n')
-
-                '''
                 f.close()
 
         start = time.time()
@@ -128,12 +123,6 @@ def main(args):
         f.write('Gamma: {}\n'.format(gamma))
         f.write('Average Loss: {}\n'.format(sum(losses) / len(losses)))
         f.write('\n\n')
-        '''
-        pgn = test_random(model, 2, args.history)
-        for g in pgn:
-            f.write(g)
-            f.write('\n\n')
-        '''
         f.close()
 
 
@@ -178,17 +167,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
-    
-    if args.model == 'td':
-        from temporal import *
-    elif args.model == 'dqn':
-        from dqn import *
-    elif args.model == 'app':
-        from apprentice import *
-    else:
-        print('Model not found: {}'.format(args.model))
-        exit()
-    
     if not args.debug:
         os.mkdir(args.path)
         settings_file = open(args.path + '/settings.txt', 'w')
@@ -196,5 +174,19 @@ if __name__ == '__main__':
             settings_file.write('{} {}\n'.format(arg, getattr(args, arg)))
 
         settings_file.close()
+    
+    if args.model == 'td':
+        from temporal import *
+        copy2('temporal.py', args.path)
+    elif args.model == 'dqn':
+        from dqn import *
+        copy2('dqn.py', args.path)
+    elif args.model == 'app':
+        from apprentice import *
+        copy2('apprentice.py', args.path)
+    else:
+        print('Model not found: {}'.format(args.model))
+        exit()
+    
 
     main(args)
