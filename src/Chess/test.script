@@ -1,0 +1,11 @@
+#!/bin/csh
+#$ -q gpu
+#$ -l gpu_card=1
+#$ -N test
+
+module load tensorflow
+module load cuda
+module load cudnn
+
+setenv CUDA_VISIBLE_DEVICES 1
+python test.py --games 3 --threads 3 --mcts 50 --path res/Wed-Apr-11-20:58:18-2018
