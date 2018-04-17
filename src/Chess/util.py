@@ -2,6 +2,7 @@ import collections
 import numpy as np
 import chess
 import chess.pgn
+import random
 
 SIZE = 8
 STEP = 8
@@ -21,6 +22,24 @@ ONEHOT = {
     'q': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
     'k': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     }
+
+def random_board(N):
+    '''
+    Get a random board state N steps in the future
+    '''
+    board = chess.Board()
+
+    for _ in range(N):
+        possible_moves = list(board.legal_moves)
+        
+        #try again
+        if len(possible_moves) < 1:
+            return random_board(N)
+
+        move = random.choice(possible_moves)
+        board.push(move)
+
+    return board
 
 def to_pgn(board):
     '''
