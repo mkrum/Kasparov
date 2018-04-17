@@ -61,13 +61,12 @@ def main(args):
         print('Loading {}'.format(args.load))
         model.load(args.load)
 
-    gamma = args.gamma
     for it in range(args.iter):
         if it > 0:
 
             if not args.debug:
                 f = open(args.path + '/' + str(it), 'w')
-                f.write('Gamma: {}\n'.format(gamma))
+                f.write('Gamma: {}\n'.format(args.gamma))
                 f.write('Average Loss: {}\n'.format(sum(losses) / len(losses)))
                 f.write('Time (Minutes): {}\n'.format(((end - start) / 60)))
                 f.write('\n\n')
@@ -80,7 +79,7 @@ def main(args):
         for p in range(args.threads):
             parent_conn, child_conn = mp.Pipe()
             conns.append(parent_conn)
-            processes.append(mp.Process(target=chess_worker, args=(child_conn, gamma, args.history)))
+            processes.append(mp.Process(target=chess_worker, args=(child_conn, args)))
             processes[-1].start()
         
         games = 0
@@ -110,7 +109,8 @@ def main(args):
             p.terminate()
             p.join()
 
-        gamma *= args.decay
+        args.gamma *= args.decay
+        args.lam *= args.decay
 
         if not args.debug:
             model.save(args.path + '/.modelprog')
@@ -133,10 +133,10 @@ if __name__ == '__main__':
     parser.add_argument('--model', metavar='e', type=str, default='dqn',
                     help='Specify which model you want to train')
 
-    parser.add_argument('--threads', metavar='t', type=int, default=1,
+    parser.add_argument('--threads', metavar='t', type=int, default=20,
                     help='Number of threads.')
 
-    parser.add_argument('--iter', metavar='i', type=int, default=1,
+    parser.add_argument('--iter', metavar='i', type=int, default=100,
                     help='Number of iterations')
 
     parser.add_argument('--epoch', metavar='e', type=int, default=100,
@@ -154,10 +154,13 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', metavar='g', type=float, default=1.0,
                     help='Exploration parameter')
 
+    parser.add_argument('--lam', metavar='l', type=float, default=50,
+                    help='Lambda value for the situtional distribution')
+
     parser.add_argument('--decay', metavar='d', type=float, default=0.9,
                     help='Exploration parameter')
 
-    parser.add_argument('--history', metavar='h', type=int, default=8,
+    parser.add_argument('--history', metavar='h', type=int, default=2,
                     help='Number of previous boards to include in the input')
 
     savepath = 'res/' + '-'.join(time.ctime().split())
@@ -184,6 +187,9 @@ if __name__ == '__main__':
     elif args.model == 'app':
         from apprentice import *
         copy2('apprentice.py', args.path)
+    elif args.model == 's_td':
+        from sit_temporal import *
+        copy2('sit_temporal.py', args.path)
     else:
         print('Model not found: {}'.format(args.model))
         exit()

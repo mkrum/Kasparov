@@ -1,4 +1,3 @@
-
 import os.path
 import tensorflow as tf
 import chess
@@ -6,7 +5,7 @@ import numpy as np
 import random
 import copy
 
-from util import build_input, get_input
+from util import build_input, get_input, random_board
 
 class DQN(object):
 
@@ -45,18 +44,17 @@ class DQN(object):
 
         b_conv3 = tf.layers.batch_normalization(conv3)
 
-
         conv_flatten = tf.reshape(b_conv3, [-1, 8 * 8 * features[-1]])
 
-        fc1 = tf.layers.dense(inputs=conv_flatten, units=fcneurons[0])
-        fc2 = tf.layers.dense(inputs=fc1, units=fcneurons[1])
-        self._estimate = tf.layers.dense(inputs=fc2, units=fcneurons[2])
+        fc1 = tf.layers.dense(inputs=conv_flatten, units=fcneurons[0], activation=tf.nn.relu)
+        fc2 = tf.layers.dense(inputs=fc1, units=fcneurons[1], activation=tf.nn.relu)
+        self._estimate = tf.layers.dense(inputs=fc2, units=fcneurons[2], activation=tf.nn.tanh)
 
         self._loss = tf.squared_difference(self._estimate, self.rewards)
         self._av_loss = tf.reduce_mean(self._loss)
         self.print_loss = tf.reduce_mean(tf.squared_difference(self._estimate, self.rewards))
 
-        self._optimizer = tf.train.AdagradOptimizer(1E-4).minimize(self._av_loss) 
+        self._optimizer = tf.train.AdagradOptimizer(2E-4).minimize(self._loss) 
         self.sess.run(tf.global_variables_initializer())
 
         self.saver = tf.train.Saver()
@@ -125,15 +123,29 @@ def max_select(boards, model, history):
     return best_move
 
 def select(boards, model, history):
-    return max_select(boards, model, history)
+    return min_select(boards, model, history)
 
 def chess_worker(connection, args):
+
+    lam = 0.7
+
     while True:
-        board = chess.Board()
+        
+        steps = min(np.random.poisson(args.lam), 100)
+        board = random_board(steps)
+
         player = 1
 
-        boards = []
+        vals = []
+        rewards = []
+
+        pid = 1
+        boards = [copy.deepcopy(board)]
         while not board.is_game_over(claim_draw=True):
+
+            connection.send({'type': 'eval', 'boards': boards[-8:]})
+            val = connection.recv()
+            vals.append(val)
 
             if random.random() > args.gamma:
                 connection.send({'type': 'board', 'boards': boards[-8:]})
@@ -141,22 +153,30 @@ def chess_worker(connection, args):
             else:
                 move = random.choice(list(board.legal_moves))
 
-            player = (player % 2) + 1
+            rewards.append(0)
 
             board.push(move)
-            boards.append(copy.copy(board))
+            boards.append(copy.deepcopy(board))
+
+            if len(boards) > 8:
+                boards.pop(0)
+
+            pid = (pid % 2 + 1)
 
         res = board.result()
+        if res in ['1-0', '0-1']:
+            rewards[-1] = 1
+            rewards[-2] = -1
 
-        if res == '1-0':
-            rewards = [ -1 if (i % 2) == 0 else 1 for i in range(len(boards)) ]
-        elif res == '0-1':
-            rewards = [ 1 if (i % 2) == 0 else -1 for i in range(len(boards)) ]
-        else:
-            rewards = [ 0 for i in range(len(boards)) ]
-        
-        rewards = np.expand_dims(np.array(rewards).T, 1)
-        in_boards, in_rewards = build_input(boards, rewards, args.history)
-        connection.send({'type': 'data', 'inp': in_boards, 'rewards': in_rewards})    
+        targets = []
+        for i in range(len(boards) - 2):
+            targets.append(rewards[i] + vals[i + 2])
+
+        targets.append(rewards[-2])
+        targets.append(rewards[-1])
+
+        targets = np.expand_dims(np.array(targets), 1)
+        in_boards, in_targets = build_input(boards, targets, args.history)
+
+        connection.send({'type': 'data', 'inp': in_boards, 'rewards': in_targets})    
         connection.send({'type': 'end'})
-
