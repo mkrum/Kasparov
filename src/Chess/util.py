@@ -1,8 +1,8 @@
+import random
 import collections
 import numpy as np
 import chess
 import chess.pgn
-import random
 
 SIZE = 8
 STEP = 8
@@ -31,7 +31,7 @@ def random_board(N):
 
     for _ in range(N):
         possible_moves = list(board.legal_moves)
-        
+
         #try again
         if len(possible_moves) < 1:
             return random_board(N)
@@ -59,20 +59,21 @@ def build_input(boards, rewards, history):
     '''
     Converts a list of boards through time into respective model inputs
     '''
-    
+
     size = len(boards)
-    inputs = np.zeros((size, 8, 8,  12 * history + 9))
+    inputs = np.zeros((size, 8, 8, 12 * history + 9))
 
     for i in range(1, len(boards) + 1):
         inputs[(i - 1), :, :, :] = get_input(boards[:i], history)
-    
+
     paritions = np.ceil(float(size)/10.0)
     return np.array_split(inputs, paritions), np.array_split(rewards, paritions)
+
 
 def get_input(boards, history):
     ''' returns the representation of the game state '''
     boards = boards[-history:]
-    
+
     if len(boards) == 0:
         boards.append(chess.Board())
 
