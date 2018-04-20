@@ -23,6 +23,7 @@ ONEHOT = {
     'k': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     }
 
+
 def random_board(N):
     '''
     Get a random board state N steps in the future
@@ -41,10 +42,9 @@ def random_board(N):
 
     return board
 
+
 def to_pgn(board):
-    '''
-    Converts a board object into a pgn file
-    '''
+    ''' Converts a board object into a pgn file '''
     game = chess.pgn.Game()
     moves = list(board.move_stack)
     node = game.add_variation(moves[0])
@@ -56,14 +56,12 @@ def to_pgn(board):
 
 
 def build_input(boards, rewards, history):
-    '''
-    Converts a list of boards through time into respective model inputs
-    '''
+    ''' Converts a list of boards through time into respective model inputs '''
 
-    size = len(boards)
+    size = len(boards) - 1
     inputs = np.zeros((size, 8, 8, 12 * history + 9))
 
-    for i in range(1, len(boards) + 1):
+    for i in range(1, len(boards)):
         inputs[(i - 1), :, :, :] = get_input(boards[:i], history)
 
     paritions = np.ceil(float(size)/10.0)
@@ -137,7 +135,6 @@ def get_constants(board):
     constants.extend(repetitions)
 
     return constants
-
 
 
 def get_depth(boards, square, constants, depth_size, history):
