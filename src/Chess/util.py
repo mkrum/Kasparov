@@ -25,7 +25,6 @@ ONEHOT = {
 
 
 def board_value(board):
-    
     #based on hans berliner
     values = {chess.PAWN : 1,
               chess.KNIGHT : 3.2,
@@ -33,7 +32,7 @@ def board_value(board):
               chess.ROOK: 5.1,
               chess.QUEEN : 8.8,
               chess.KING : 100}
-    
+
     state = np.zeros((8, 8))
     for i in range(SIZE):
         for j in range(SIZE):
@@ -53,14 +52,13 @@ def get_simple_input(boards, history):
     ''' returns the representation of the game state '''
     boards = boards[-history:]
     cur = boards[-1]
-    
+
     inp = np.zeros((SIZE, SIZE, history))
     for i, board in enumerate(boards):
         b = board if cur.turn else board.mirror()
         inp[:, :, i] = board_value(b)
 
     return inp
-
 
 def random_board(N):
     '''
@@ -80,10 +78,9 @@ def random_board(N):
 
     return board
 
+
 def to_pgn(board):
-    '''
-    Converts a board object into a pgn file
-    '''
+    ''' Converts a board object into a pgn file '''
     game = chess.pgn.Game()
     moves = list(board.move_stack)
     node = game.add_variation(moves[0])
@@ -94,9 +91,7 @@ def to_pgn(board):
     return str(game)
 
 def build_input(boards, rewards, history):
-    '''
-    Converts a list of boards through time into respective model inputs
-    '''
+    ''' Converts a list of boards through time into respective model inputs '''
 
     size = len(boards) - 1
     #inputs = np.zeros((size, 8, 8,  12 * history + 9))
@@ -176,7 +171,6 @@ def get_constants(board):
     constants.extend(repetitions)
 
     return constants
-
 
 
 def get_depth(boards, square, constants, depth_size, history):

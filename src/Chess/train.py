@@ -1,20 +1,16 @@
 from __future__ import print_function
 
-import chess
-import copy
-import threading
-import multiprocessing as mp
-import numpy as np
-import argparse
-import sys
-import time
-
-import chess.uci
 import os
-from util import get_input, to_pgn
+import copy
+import multiprocessing as mp
+import argparse
+import time
 
 from shutil import copy2
 
+import chess
+import chess.uci
+from util import get_input, to_pgn
 
 def test_random(model, size, history):
     '''
@@ -81,7 +77,7 @@ def main(args):
             conns.append(parent_conn)
             processes.append(mp.Process(target=chess_worker, args=(child_conn, args)))
             processes[-1].start()
-        
+
         games = 0
         losses = []
         while games < args.epoch:
@@ -92,7 +88,7 @@ def main(args):
 
                     if msg['type'] == 'data':
                         losses.append(model.train(msg['inp'], msg['rewards']))
-                            
+
                     elif msg['type'] == 'board':
                         conn.send(select(msg['boards'], model, args.history))
 
@@ -130,16 +126,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Specify the training setup.')
 
     parser.add_argument('--model', metavar='e', type=str, default='dqn',
-                    help='Specify which model you want to train')
+                        help='Specify which model you want to train')
 
     parser.add_argument('--threads', metavar='t', type=int, default=20,
-                    help='Number of threads.')
+                        help='Number of threads.')
 
     parser.add_argument('--iter', metavar='i', type=int, default=100,
-                    help='Number of iterations')
+                        help='Number of iterations')
 
     parser.add_argument('--epoch', metavar='e', type=int, default=100,
-                    help='Size of each epoch')
+                        help='Size of each epoch')
 
     parser.add_argument('--quiet', dest='quiet', action='store_const',
                         const=True, default=False, help='Repress progress output')
@@ -148,50 +144,50 @@ if __name__ == '__main__':
                         const=True, default=False, help='Repress any saving')
 
     parser.add_argument('--load', metavar='l', type=str, default=None,
-                    help='Load a pre existing file')
+                        help='Load a pre existing file')
 
     parser.add_argument('--gamma', metavar='g', type=float, default=1.0,
-                    help='Exploration parameter')
+                        help='Exploration parameter')
 
     parser.add_argument('--lam', metavar='l', type=float, default=50,
-                    help='Lambda value for the situtional distribution')
+                        help='Lambda value for the situtional distribution')
 
     parser.add_argument('--decay', metavar='d', type=float, default=0.9,
-                    help='Exploration parameter')
+                        help='Exploration parameter')
 
     parser.add_argument('--history', metavar='h', type=int, default=2,
-                    help='Number of previous boards to include in the input')
+                        help='Number of previous boards to include in the input')
 
     savepath = 'res/' + '-'.join(time.ctime().split())
     parser.add_argument('--path', metavar='p', type=str, default=savepath,
-                    help='Experiment path')
+                        help='Experiment path')
 
-    args = parser.parse_args()
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+    arguments = parser.parse_args()
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    if not args.debug:
-        os.mkdir(args.path)
-        settings_file = open(args.path + '/settings.txt', 'w')
-        for arg in vars(args):
-            settings_file.write('{} {}\n'.format(arg, getattr(args, arg)))
+    if not arguments.debug:
+        os.mkdir(arguments.path)
+        settings_file = open(arguments.path + '/settings.txt', 'w')
+        for arg in vars(arguments):
+            settings_file.write('{} {}\n'.format(arg, getattr(arguments, arg)))
 
         settings_file.close()
-    
-    if args.model == 'td':
-        from temporal import *
-        copy2('temporal.py', args.path)
-    elif args.model == 'dqn':
-        from dqn import *
-        copy2('dqn.py', args.path)
-    elif args.model == 'app':
-        from apprentice import *
-        copy2('apprentice.py', args.path)
-    elif args.model == 's_td':
-        from sit_temporal import *
-        copy2('sit_temporal.py', args.path)
-    else:
-        print('Model not found: {}'.format(args.model))
-        exit()
-    
 
-    main(args)
+    if arguments.model == 'td':
+        from temporal import *
+        copy2('temporal.py', arguments.path)
+    elif arguments.model == 'dqn':
+        from dqn import *
+        copy2('dqn.py', arguments.path)
+    elif arguments.model == 'app':
+        from apprentice import *
+        copy2('apprentice.py', arguments.path)
+    elif arguments.model == 's_td':
+        from sit_temporal import *
+        copy2('sit_temporal.py', arguments.path)
+    else:
+        print('Model not found: {}'.format(arguments.model))
+        exit()
+
+
+    main(arguments)
