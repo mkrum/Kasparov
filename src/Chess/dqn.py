@@ -1,21 +1,16 @@
 import os.path
-import random
-
 import tensorflow as tf
 import chess
 import chess.uci
 import numpy as np
-
-import chess
+import random
+import copy
 
 from util import build_input, get_input, random_board, get_simple_input
 
-
 class DQN(object):
-    def __init__(self):
-        self.sess = tf.train.Session()
-        self.saver = tf.train.Saver()
 
+    def __init__(self):
         N = 2
         self.sess = tf.Session()
         features = [64, 128, 256]
@@ -49,6 +44,8 @@ class DQN(object):
                     padding='same',
                     activation=tf.nn.elu)
 
+        b_conv3 = tf.layers.batch_normalization(conv3)
+
         conv_flatten = tf.reshape(b_conv3, [-1, 8 * 8 * features[-1]])
 
         fc1 = tf.layers.dense(inputs=conv_flatten, units=fcneurons[0], activation=tf.nn.elu)
@@ -62,25 +59,23 @@ class DQN(object):
         self._optimizer = tf.train.AdagradOptimizer(2E-4).minimize(self._av_loss) 
         self.sess.run(tf.global_variables_initializer())
 
-
+        self.saver = tf.train.Saver()
+    
     def evaluate(self, boards):
-        return self.sess.run(self.output, feed_dict={self.inputs: boards})
-
+        return self.sess.run(self._estimate, feed_dict={self.states: boards})
 
     def train(self, boards, rewards):
         losses = []
+        for b, r in zip(boards, rewards): 
+            _, loss = self.sess.run([self._optimizer, self._av_loss],
+                                 feed_dict={self.states: b, self.rewards: r})
 
-        for b, r in zip(boards, rewards):
-            feed = {self.rewards: r, self.inputs: b}
-            _, loss = self.sess.run((self.optimizer. self.loss), feed_dict=feed)
             losses.append(loss)
 
         return sum(losses)/len(losses)
 
-
     def save(self, path='./.modelprog'):
-        self.saver(self.sess, path)
-
+        self.saver.save(self.sess, path)
 
     def load(self, path='./.modelprog'):
         meta_path = path + '/.modelprog.meta'
@@ -89,7 +84,6 @@ class DQN(object):
             self.saver.restore(self.sess, tf.train.latest_checkpoint(path))
         else:
             print("HEY FUCKHEAD")
-
 
 def min_select(boards, model, history):
     if len(boards) == 0:
@@ -109,12 +103,8 @@ def min_select(boards, model, history):
         if val < min_val:
             min_val = val
             best_move = move
-            best_result = result
-
-        boards.pop()
 
     return best_move
-
 
 def max_select(boards, model, history):
     if len(boards) == 0:
@@ -137,17 +127,11 @@ def max_select(boards, model, history):
         if val > max_val:
             max_val = val
             best_move = move
-            best_result = result
-
-        boards.pop()
 
     return best_move
 
-
 def select(boards, model, history):
-    ''' calls max select '''
     return max_select(boards, model, history)
-
 
 def chess_worker(connection, args):
 
