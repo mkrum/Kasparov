@@ -179,6 +179,9 @@ if __name__ == '__main__':
     elif arguments.model == 'dqn':
         from dqn import *
         copy2('dqn.py', arguments.path)
+    elif arguments.model == 'alt_dqn':
+        from dqn import *
+        copy2('alt_dqn.py', arguments.path)
     elif arguments.model == 'app':
         from apprentice import *
         copy2('apprentice.py', arguments.path)
