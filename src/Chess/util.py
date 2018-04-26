@@ -23,6 +23,45 @@ ONEHOT = {
     'k': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
     }
 
+
+def board_value(board):
+    
+    #based on hans berliner
+    values = {chess.PAWN : 1,
+              chess.KNIGHT : 3.2,
+              chess.BISHOP : 3.33,
+              chess.ROOK: 5.1,
+              chess.QUEEN : 8.8,
+              chess.KING : 100}
+    
+    state = np.zeros((8, 8))
+    for i in range(SIZE):
+        for j in range(SIZE):
+            square = chess.square(i, j)
+            piece = board.piece_at(square)
+
+            if piece is not None:
+                state[i, j] = values[piece.piece_type]
+
+                if piece.color == chess.BLACK:
+                    state[i, j] *= -1
+
+    return state
+
+
+def get_simple_input(boards, history):
+    ''' returns the representation of the game state '''
+    boards = boards[-history:]
+    cur = boards[-1]
+    
+    inp = np.zeros((SIZE, SIZE, history))
+    for i, board in enumerate(boards):
+        b = board if cur.turn else board.mirror()
+        inp[:, :, i] = board_value(b)
+
+    return inp
+
+
 def random_board(N):
     '''
     Get a random board state N steps in the future
@@ -54,17 +93,17 @@ def to_pgn(board):
 
     return str(game)
 
-
 def build_input(boards, rewards, history):
     '''
     Converts a list of boards through time into respective model inputs
     '''
     
-    size = len(boards)
-    inputs = np.zeros((size, 8, 8,  12 * history + 9))
+    size = len(boards) - 1
+    #inputs = np.zeros((size, 8, 8,  12 * history + 9))
+    inputs = np.zeros((size, 8, 8, history))
 
-    for i in range(1, len(boards) + 1):
-        inputs[(i - 1), :, :, :] = get_input(boards[:i], history)
+    for i in range(1, len(boards)):
+        inputs[(i - 1), :, :, :] = get_simple_input(boards[:i], history)
     
     paritions = np.ceil(float(size)/10.0)
     return np.array_split(inputs, paritions), np.array_split(rewards, paritions)

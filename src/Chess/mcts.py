@@ -1,6 +1,6 @@
 import copy
 import numpy as np
-from util import get_input
+from util import get_input, get_simple_input
 import chess
 
 def softmax(vals):
@@ -11,9 +11,9 @@ def softmax(vals):
 
 class MCTS(object):
 
-    def __init__(self, model, boards):
+    def __init__(self, model, boards, history):
         self.model = model
-        self.root = Node(self.model, boards)
+        self.root = Node(self.model, boards, history)
 
     def search(self, iters=10):
         '''
@@ -49,7 +49,7 @@ class Edge(object):
         '''
 
         if self.parent.leading_edge is not None:
-            self.parent.leading_edge.backprop(-1* value)
+            self.parent.leading_edge.backprop(value)
 
         self.N += 1
         self.Q += 1.0 /self.N * (value - self.Q)
@@ -58,12 +58,13 @@ class Edge(object):
 
 class Node(object):
 
-    def __init__(self, model, boards):
+    def __init__(self, model, boards, history):
+        self.history = history
         self.model = model
         self.boards = boards
         self.leading_edge = None
         self.edges = []
-        self.value = model.evaluate(get_input(self.boards))
+        self.value = model.evaluate(np.expand_dims(get_simple_input(self.boards, self.history), 0))
 
     def attach(self, edge):
         self.leading_edge = edge
@@ -111,7 +112,7 @@ class Node(object):
             new_boards.append(hyp_board)
 
 
-            child_node = Node(self.model, new_boards)
+            child_node = Node(self.model, new_boards, self.history)
             new_edge = Edge(self, child_node, move, prob)
                 
             child_node.attach(new_edge)
@@ -138,7 +139,7 @@ class Node(object):
         
         return self.edges[edge_counts.index(max(edge_counts))].move
 
-def mcts_evaluate(model, boards, tau=1.0):
+def mcts_evaluate(model, boards, N, history, tau=1.0):
     '''
     Board evaluation function using MCTS
     '''
@@ -146,8 +147,8 @@ def mcts_evaluate(model, boards, tau=1.0):
     if len(boards) == 0:
         boards = [chess.Board()]
 
-    tree = MCTS(model, copy.deepcopy(boards))
-    move = tree.search()
+    tree = MCTS(model, copy.deepcopy(boards), history)
+    move = tree.search(N)
 
     return move
 

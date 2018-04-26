@@ -1,0 +1,12 @@
+load None
+lam 50
+decay 0.9
+quiet True
+iter 10000
+epoch 1000
+threads 20
+debug False
+path res/Wed-Apr-25-15:42:58-2018
+model app
+gamma 1.0
+history 2

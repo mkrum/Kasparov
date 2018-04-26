@@ -12,7 +12,7 @@ import time
 
 import chess.uci
 import os
-from util import get_input, to_pgn
+from util import get_input, to_pgn, get_simple_input
 from mcts import mcts_evaluate
 import numpy as np
 
@@ -21,6 +21,7 @@ import heapq
 def find_settings(path):
     settings_file = open(path + '/settings.txt', 'r')
     lines = settings_file.read().splitlines()
+    print(lines)
     model = lines[9].split()[-1]
     #model = lines[8].split()[-1]
     history = int(lines[-1].split()[-1])
@@ -54,18 +55,18 @@ def main(args):
 
             for move in possible_moves:
                 t_boards = copy.deepcopy(boards)
-                t_curr = t_boards[-1]
+                t_curr = copy.copy(t_boards[-1])
                 t_curr.push(move)
                 t_boards.append(t_curr)
 
                 board_moves.append(t_curr)
-                
-                vals.append(model.evaluate(get_input(t_boards, args.history)))
+
+                vals.append(model.evaluate(np.expand_dims(get_simple_input(t_boards, args.history), 0)))
 
                 if stk_move == move:
                     stk_val = vals[-1]
                     stk_board = t_curr
-            
+
             top_5 = heapq.nlargest(3, vals)
             bottom_5 = heapq.nsmallest(3, vals)
             
@@ -98,7 +99,9 @@ def main(args):
             
             cont = input('Continue?')
         else:
-            move = random.choice(list(board.legal_moves))
+            #move = random.choice(list(board.legal_moves))
+            engine.position(board)
+            move, _ = engine.go()
 
         player = (player % 2) + 1
 

@@ -1,55 +1,62 @@
 import os.path
 import tensorflow as tf
 import chess
+import chess.uci
 import numpy as np
 import random
 import copy
 
-from util import build_input, get_input
+from util import build_input, get_input, random_board, get_simple_input
 
 class DQN(object):
 
     def __init__(self):
         N = 2
         self.sess = tf.Session()
-
         features = [64, 128, 256]
         fcneurons = [512, 256, 1]
         self.rewards = tf.placeholder(tf.float32, [None, 1])
-        self.states = tf.placeholder(tf.float32, [None, 8, 8, 12 * N + 9])
+        #self.states = tf.placeholder(tf.float32, [None, 8, 8, 12 * N + 9])
+        self.states = tf.placeholder(tf.float32, [None, 8, 8, 2])
 
         conv1 = tf.layers.conv2d(
                     inputs=self.states,
                     filters=features[0],
                     kernel_size=[4, 4],
                     padding='same',
-                    activation=tf.nn.relu)
+                    activation=tf.nn.elu)
+        
+        b_conv1 = tf.layers.batch_normalization(conv1)
 
         conv2 = tf.layers.conv2d(
-                    inputs=conv1,
+                    inputs=b_conv1,
                     filters=features[1],
                     kernel_size=[4, 4],
                     padding='same',
-                    activation=tf.nn.relu)
+                    activation=tf.nn.elu)
+
+        b_conv2 = tf.layers.batch_normalization(conv2)
 
         conv3 = tf.layers.conv2d(
-                    inputs=conv2,
+                    inputs=b_conv2,
                     filters=features[2],
                     kernel_size=[4, 4],
                     padding='same',
-                    activation=tf.nn.relu)
+                    activation=tf.nn.elu)
 
-        conv_flatten = tf.reshape(conv3, [-1, 8 * 8 * features[-1]])
+        b_conv3 = tf.layers.batch_normalization(conv3)
 
-        fc1 = tf.layers.dense(inputs=conv_flatten, units=fcneurons[0], activation=tf.nn.relu)
-        fc2 = tf.layers.dense(inputs=fc1, units=fcneurons[1], activation=tf.nn.relu)
-        self._estimate = tf.layers.dense(inputs=fc2, units=fcneurons[2], activation=tf.nn.tanh)
+        conv_flatten = tf.reshape(b_conv3, [-1, 8 * 8 * features[-1]])
 
-        self._loss = tf.squared_difference(self._estimate, self.rewards)
+        fc1 = tf.layers.dense(inputs=conv_flatten, units=fcneurons[0], activation=tf.nn.elu)
+        fc2 = tf.layers.dense(inputs=fc1, units=fcneurons[1], activation=tf.nn.elu)
+        self._estimate = tf.layers.dense(inputs=fc2, units=fcneurons[2], activation=tf.nn.sigmoid)
+
+        self._loss = tf.losses.mean_squared_error(self._estimate, self.rewards)
         self._av_loss = tf.reduce_mean(self._loss)
         self.print_loss = tf.reduce_mean(tf.squared_difference(self._estimate, self.rewards))
 
-        self._optimizer = tf.train.AdagradOptimizer(1E-4).minimize(self._loss) 
+        self._optimizer = tf.train.AdagradOptimizer(2E-4).minimize(self._av_loss) 
         self.sess.run(tf.global_variables_initializer())
 
         self.saver = tf.train.Saver()
@@ -89,7 +96,7 @@ def min_select(boards, model, history):
         t_curr.push(move)
         t_boards.append(t_curr)
 
-        val = model.evaluate(get_input(t_boards, history))
+        val = model.evaluate(np.expand_dims(get_simple_input(t_boards, history), 0))
         if val < min_val:
             min_val = val
             best_move = move
@@ -110,7 +117,7 @@ def max_select(boards, model, history):
         t_curr.push(move)
         t_boards.append(t_curr)
 
-        val = model.evaluate(get_input(t_boards, history))
+        val = model.evaluate(np.expand_dims(get_simple_input(t_boards, history), 0))
         if val > max_val:
             max_val = val
             best_move = move
@@ -118,9 +125,10 @@ def max_select(boards, model, history):
     return best_move
 
 def select(boards, model, history):
-    return min_select(boards, model, history)
+    return max_select(boards, model, history)
 
-def chess_worker(connection, gamma, history):
+def chess_worker(connection, args):
+
     lam = 0.7
     while True:
         board = chess.Board()
@@ -137,7 +145,7 @@ def chess_worker(connection, gamma, history):
             val = connection.recv()
             vals.append(val)
 
-            if random.random() > gamma:
+            if random.random() > args.gamma:
                 connection.send({'type': 'board', 'boards': boards[-8:]})
                 move = connection.recv()
             else:
@@ -154,19 +162,21 @@ def chess_worker(connection, gamma, history):
             pid = (pid % 2 + 1)
 
         res = board.result()
+
+        rewards = [0] * (len(boards) - 1)
         if res in ['1-0', '0-1']:
             rewards[-1] = 1
-            rewards[-2] = -1
+            rewards[-2] = 0
 
         targets = []
-        for i in range(len(boards) - 2):
-            targets.append(rewards[i] + vals[i + 2])
+        for i in range(len(boards) - 3):
+            targets.append(rewards[i] + lam * vals[i + 2])
 
         targets.append(rewards[-2])
         targets.append(rewards[-1])
 
         targets = np.expand_dims(np.array(targets), 1)
-        in_boards, in_targets = build_input(boards, targets, history)
+        in_boards, in_targets = build_input(boards, targets, args.history)
 
         connection.send({'type': 'data', 'inp': in_boards, 'rewards': in_targets})    
         connection.send({'type': 'end'})

@@ -97,7 +97,7 @@ def main(args):
                         conn.send(select(msg['boards'], model, args.history))
 
                     elif msg['type'] == 'eval':
-                        conn.send(model.evaluate(get_input(msg['boards'], args.history)))
+                        conn.send(model.evaluate(np.expand_dims(get_simple_input(msg['boards'], args.history), 0)))
 
                     elif msg['type'] == 'end':
 
@@ -110,7 +110,6 @@ def main(args):
             p.join()
 
         args.gamma *= args.decay
-        args.lam *= args.decay
 
         if not args.debug:
             model.save(args.path + '/.modelprog')

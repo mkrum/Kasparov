@@ -14,17 +14,23 @@ import chess.uci
 import os
 from util import get_input, to_pgn
 from mcts import mcts_evaluate
+from lookahead import lookahead_select
 import numpy as np
+
 
 def find_settings(path):
     settings_file = open(path + '/settings.txt', 'r')
     lines = settings_file.read().splitlines()
     model = lines[9].split()[-1]
-    #model = lines[8].split()[-1]
     history = int(lines[-1].split()[-1])
     return model, history
 
 def game_worker(connection, args):
+
+    #setup model
+    model = DQN()
+    model.load(args.path)
+
     #setup stockfish
     if args.stockfish > -1:
         engine = chess.uci.popen_engine(os.environ['SFSH'])
@@ -40,8 +46,13 @@ def game_worker(connection, args):
         while not board.is_game_over(claim_draw=True):
 
             if player == 1:
-                connection.send({'type': 'board', 'boards': boards[-8:]})
-                move = connection.recv()
+                if args.mcts == -1 and args.look == -1:
+                    move = select(boards, model, args.history)
+                elif args.look > 0:
+                    print('using lookahead search')
+                    move = lookahead_select(boards, model, args.history, args.look)
+                else:
+                    move = mcts_evaluate(model, boards, args.mcts, args.history)
             else:
                 if args.stockfish == -1:
                     move = random.choice(list(board.legal_moves))
@@ -62,8 +73,6 @@ def game_worker(connection, args):
 
 
 def main(args):
-    model = DQN()
-    model.load(args.path)
     conns = []
     processes = []
     for p in range(args.threads):
@@ -80,13 +89,7 @@ def main(args):
             if conn.poll():
                 msg = conn.recv()
 
-                if msg['type'] == 'board':
-                    if args.mcts == -1:
-                        conn.send(select(msg['boards'], model, args.history))
-                    else:
-                        conn.send(mcts_evaluate(model, msg['boards'], args.mcts, args.history))
-
-                elif msg['type'] == 'end':
+                if msg['type'] == 'end':
                     games += 1
                     print(msg['result'])
                     print(msg['pgn'])
@@ -112,6 +115,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--mcts', metavar='m', type=int, default=-1,
                     help='Use MCTS evaluation')
+
+    parser.add_argument('--look', metavar='m', type=int, default=-1,
+                    help='Use lookahead evaluation')
 
     parser.add_argument('--stockfish', metavar='o', type=int, default=-1,
                     help='Play against specified level of stockfish')
