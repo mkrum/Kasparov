@@ -13,10 +13,10 @@ from util import build_input, get_input, get_simple_input
 
 class DQN(object):
     def __init__(self):
-        self.sess = tf.train.Session()
+        self.sess = tf.Session()
         self.saver = tf.train.Saver()
 
-        N = 2
+        N = 1
         num_filters = [32, 64, 64]
         kernel_sizes = [[8, 8], [4, 4], [3, 3]]
         strides = [4, 2, 1]
@@ -24,7 +24,7 @@ class DQN(object):
 
         self.rewards = tf.placeholder(tf.float32, [-1, 1])
         # self.inputs = tf.placeholder(tf.int16, [-1, 8, 8, 12 * N + 9])
-        self.inputs = tf.placeholder(tf.int16, [-1, 8, 8, N])
+        self.inputs = tf.placeholder(tf.float32, [-1, 8, 8, N])
 
         conv1 = tf.layers.conv2d(
             inputs=self.inputs,
@@ -80,7 +80,7 @@ class DQN(object):
 
 
     def save(self, path='./.modelprog'):
-        self.saver(self.sess, path)
+        self.saver.save(self.sess, path)
 
 
     def load(self, path='./.movelprog'):
@@ -90,6 +90,12 @@ class DQN(object):
             self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
         else:
             print('{} does not exist'.format(meta_path))
+
+
+
+def evaluate(boards, model, history):
+    inputs = np.expand_dims(get_simple_input(boards, history), 0)
+    return model.evaluate(inputs)
 
 
 def min_select(boards, model, history):
@@ -105,8 +111,7 @@ def min_select(boards, model, history):
     for move in current.legal_moves:
         next_board = current.copy().push(move)
         boards.append(next_board)
-        inputs = np.expand_dims(get_simple_input(boards, history), 0)
-        result = model.evaluate(inputs)
+        result = evaluate(boards, model, history)
 
         if result < best_result:
             best_move = move
@@ -128,13 +133,14 @@ def max_select(boards, model, history):
     best_result = float('-inf')
 
     for move in current.legal_moves:
-        next_board = current.copy().push(move)
-        boards.append(next_board)
-        inputs = np.expand_dims(get_simple_input(boards, history), 0)
-        result = model.evaluate(inputs)
+        next_board = current.copy()
+        next_board.push(move)
 
-        if current.is_checkmate():
-            return move
+        if next_board.is_checkmate():
+            return move, float('inf')
+
+        boards.append(next_board)
+        result = evaluate(boards, model, history)
 
         if result > best_result:
             best_move = move
@@ -142,12 +148,59 @@ def max_select(boards, model, history):
 
         boards.pop()
 
+    return best_move, best_result
+
+
+def lookahead_select(boards, model, history):
+    if len(boards) == 0:
+        boards.append(chess.Board())
+
+    current = boards[-1]
+
+    legal = list(current.legal_moves)
+
+    values = []
+
+    if len(legal) == 1:
+        return legal[0]
+
+    for move in legal:
+        next_board = current.copy()
+        next_board.push(move)
+        
+        if next_board.is_checkmate():
+            return move
+        
+        boards.append(next_board)
+        result = evaluate(boards, model, history)
+
+        values.append((result, move))
+        
+        boards.pop()
+
+    best = sorted(values, key=lambda x: x[0], reverse=True)[:5]
+
+    best_move = None
+    best_result = float('inf')
+
+    for _, move in best:
+        next_board = current.copy()
+        next_board.push(move)
+        boards.append(next_board)
+        _, value = max_select(boards, model, history)
+
+        if value <= best_result:
+            best_move = move
+            best_result = value
+
+        boards.pop()
+
     return best_move
 
 
 def select(boards, model, history):
-    ''' calls max select '''
-    return max_select(boards, model, history)
+    ''' calls one of the selects '''
+    return lookahead_select(boards, model, history)
 
 
 def chess_worker(connection, args):

@@ -180,7 +180,7 @@ if __name__ == '__main__':
         from dqn import *
         copy2('dqn.py', arguments.path)
     elif arguments.model == 'alt_dqn':
-        from dqn import *
+        from alt_dqn import *
         copy2('alt_dqn.py', arguments.path)
     elif arguments.model == 'app':
         from apprentice import *
