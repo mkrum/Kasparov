@@ -14,7 +14,7 @@ import chess.uci
 import os
 from util import get_input, to_pgn
 from mcts import mcts_evaluate
-from lookahead import lookahead_select
+from alt_dqn import lookahead_select
 import numpy as np
 
 
@@ -49,8 +49,7 @@ def game_worker(connection, args):
                 if args.mcts == -1 and args.look == -1:
                     move = select(boards, model, args.history)
                 elif args.look > 0:
-                    print('using lookahead search')
-                    move = lookahead_select(boards, model, args.history, args.look)
+                    move = lookahead_select(boards, model, args.history)
                 else:
                     move = mcts_evaluate(model, boards, args.mcts, args.history)
             else:
@@ -133,6 +132,8 @@ if __name__ == '__main__':
         from temporal import *
     elif args.model == 'dqn':
         from dqn import *
+    elif args.model == 'alt_dqn':
+        from alt_dqn import *
     elif args.model == 'app':
         from apprentice import *
     elif args.model == 's_td':

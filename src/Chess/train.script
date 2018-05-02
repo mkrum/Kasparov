@@ -8,4 +8,5 @@ module load cuda
 module load cudnn
 
 setenv CUDA_VISIBLE_DEVICES 1
-python train.py --model s_td --threads 20 --epoch 100 --iter 100 --history 2 --gamma 0.0 --load res/Wed-Apr-11-20:58:18-2018
+#python train.py --model s_td --threads 20 --epoch 100 --iter 100 --history 2 --gamma 0.0 --load res/Wed-Apr-11-20:58:18-2018
+python train.py --model alt_dqn --threads 20 --epoch 100 --iter 100 --history 1 --gamma 1.0 
