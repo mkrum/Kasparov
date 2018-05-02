@@ -14,7 +14,6 @@ from util import build_input, get_input, get_simple_input
 class DQN(object):
     def __init__(self):
         self.sess = tf.Session()
-        self.saver = tf.train.Saver()
 
         N = 1
         num_filters = [32, 64, 64]
@@ -22,9 +21,9 @@ class DQN(object):
         strides = [4, 2, 1]
         units = [512, 1]
 
-        self.rewards = tf.placeholder(tf.float32, [-1, 1])
+        self.rewards = tf.placeholder(tf.float32, [None, 1])
         # self.inputs = tf.placeholder(tf.int16, [-1, 8, 8, 12 * N + 9])
-        self.inputs = tf.placeholder(tf.float32, [-1, 8, 8, N])
+        self.inputs = tf.placeholder(tf.float32, [None, 8, 8, N])
 
         conv1 = tf.layers.conv2d(
             inputs=self.inputs,
@@ -62,6 +61,8 @@ class DQN(object):
 
         init = tf.global_variables_initializer()
         self.sess.run(init)
+
+        self.saver = tf.train.Saver()
 
 
     def evaluate(self, boards):
@@ -217,8 +218,8 @@ def lookahead_select(boards, model, history):
 
 def select(boards, model, history):
     ''' calls one of the selects '''
-    return lookahead_select(boards, model, history)
-
+    move, _ = max_select(boards, model, history)
+    return move
 
 def chess_worker(connection, args):
     ''' spawns thread to play game '''
