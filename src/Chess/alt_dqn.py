@@ -179,13 +179,12 @@ def lookahead_select(boards, model, history):
 
         boards.pop()
 
-    #best = sorted(values, key=lambda x: x[0], reverse=true)[:10]
-    best = sorted(values, key=lambda x: x[0], reverse=True)
+    #best = sorted(values, key=lambda x: x[0], reverse=True)[:5]
 
     best_move = None
-    best_result = -1 * float('inf')
-    mid_vals = []
-    for _, move in best:
+    best_result = float('inf')
+
+    for _, move in values:
         next_board = current.copy()
         next_board.push(move)
         boards.append(next_board)
