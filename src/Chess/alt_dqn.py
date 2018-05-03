@@ -168,23 +168,23 @@ def lookahead_select(boards, model, history):
     for move in legal:
         next_board = current.copy()
         next_board.push(move)
-        
+
         if next_board.is_checkmate():
             return move
-        
+
         boards.append(next_board)
         result = evaluate(boards, model, history)
 
         values.append((result, move))
-        
+
         boards.pop()
 
-    best = sorted(values, key=lambda x: x[0], reverse=True)[:5]
+    #best = sorted(values, key=lambda x: x[0], reverse=True)[:5]
 
     best_move = None
     best_result = float('inf')
 
-    for _, move in best:
+    for _, move in values:
         next_board = current.copy()
         next_board.push(move)
         boards.append(next_board)
