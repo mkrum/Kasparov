@@ -178,24 +178,42 @@ def lookahead_select(boards, model, history):
         
         boards.pop()
 
-    best = sorted(values, key=lambda x: x[0], reverse=True)[:5]
+    #best = sorted(values, key=lambda x: x[0], reverse=true)[:10]
+    best = sorted(values, key=lambda x: x[0], reverse=True)
 
     best_move = None
-    best_result = float('inf')
-
+    best_result = -1 * float('inf')
+    mid_vals = []
     for _, move in best:
         next_board = current.copy()
         next_board.push(move)
         boards.append(next_board)
+
+        middle_move, middle_value = max_select(boards, model, history)
+        mid_vals.append(middle_value)
+
+        final_board = next_board.copy()
+        final_board.push(middle_move)
+        boards.append(final_board)
+
         _, value = max_select(boards, model, history)
 
-        if value <= best_result:
+        if value > best_result:
             best_move = move
             best_result = value
 
         boards.pop()
+        boards.pop()
+    
+    if best_move is not None:
+        return best_move
+    else:
 
-    return best_move
+        if len(mid_vals) > 0:
+            return best[mid_vals.index(min(mid_vals))][1]
+        else:
+            return best[0][1]
+
 
 
 def select(boards, model, history):
