@@ -13,15 +13,15 @@ class DQN(object):
     def __init__(self):
         N = 2
         self.sess = tf.Session()
-        features = [32, 64]
-        fcneurons = [64, 32, 1]
+        features = [64, 128, 256]
+        fcneurons = [512, 256, 1]
         self.rewards = tf.placeholder(tf.float32, [None, 1])
         self.states = tf.placeholder(tf.float32, [None, 3, 3, 2])
 
         conv1 = tf.layers.conv2d(
                     inputs=self.states,
                     filters=features[0],
-                    kernel_size=[2, 2],
+                    kernel_size=[4, 4],
                     padding='same',
                     activation=tf.nn.elu)
         
@@ -30,13 +30,22 @@ class DQN(object):
         conv2 = tf.layers.conv2d(
                     inputs=b_conv1,
                     filters=features[1],
-                    kernel_size=[2, 2],
+                    kernel_size=[4, 4],
                     padding='same',
                     activation=tf.nn.elu)
 
         b_conv2 = tf.layers.batch_normalization(conv2)
 
-        conv_flatten = tf.reshape(b_conv2, [-1, 3 * 3 * features[-1]])
+        conv3 = tf.layers.conv2d(
+                    inputs=b_conv2,
+                    filters=features[2],
+                    kernel_size=[4, 4],
+                    padding='same',
+                    activation=tf.nn.elu)
+
+        b_conv3 = tf.layers.batch_normalization(conv3)
+
+        conv_flatten = tf.reshape(b_conv3, [-1, 3 * 3 * features[-1]])
 
         fc1 = tf.layers.dense(inputs=conv_flatten, units=fcneurons[0], activation=tf.nn.elu)
         fc2 = tf.layers.dense(inputs=fc1, units=fcneurons[1], activation=tf.nn.elu)
@@ -46,11 +55,9 @@ class DQN(object):
         self._av_loss = tf.reduce_mean(self._loss)
         self.print_loss = tf.reduce_mean(tf.squared_difference(self._estimate, self.rewards))
 
-        self._optimizer = tf.train.AdagradOptimizer(1E-4).minimize(self._av_loss) 
+        self._optimizer = tf.train.AdagradOptimizer(2E-4).minimize(self._av_loss) 
         self.sess.run(tf.global_variables_initializer())
 
-        self.saver = tf.train.Saver()
-    
     def evaluate(self, boards):
         return self.sess.run(self._estimate, feed_dict={self.states: boards})
 
@@ -73,29 +80,8 @@ class DQN(object):
             self.saver = tf.train.import_meta_graph(meta_path)
             self.saver.restore(self.sess, tf.train.latest_checkpoint(path))
         else:
-            print('File does not exist')
+            print("File does not exist")
             exit()
-
-def min_select(boards, model, history):
-    if len(boards) == 0:
-        boards.append(chess.Board())
-    
-    curr_board = boards[-1]
-    possible = list(curr_board.legal_moves)
-    
-    min_val = float('inf')
-    for move in possible:
-        t_boards = copy.deepcopy(boards)
-        t_curr = copy.copy(t_boards[-1])
-        t_curr.push(move)
-        t_boards.append(t_curr)
-
-        val = model.evaluate(np.expand_dims(get_simple_input(t_boards, history), 0))
-        if val < min_val:
-            min_val = val
-            best_move = move
-
-    return best_move
 
 def max_select(boards, model, history):
     
@@ -106,7 +92,7 @@ def max_select(boards, model, history):
     for move in possible:
         t_boards = copy.deepcopy(boards)
         t_curr = copy.deepcopy(t_boards[-1])
-        t_curr.push(move)
+        t_curr = t_curr.push(move)
         t_boards.append(t_curr)
 
         val = model.evaluate(np.expand_dims(get_simple_input(t_boards, history), 0))
