@@ -92,8 +92,6 @@ class DQN(object):
         else:
             print('{} does not exist'.format(meta_path))
 
-
-
 def evaluate(boards, model, history):
     inputs = np.expand_dims(get_simple_input(boards, history), 0)
     return model.evaluate(inputs)
@@ -179,12 +177,13 @@ def lookahead_select(boards, model, history):
 
         boards.pop()
 
-    #best = sorted(values, key=lambda x: x[0], reverse=True)[:5]
+    #best = sorted(values, key=lambda x: x[0], reverse=true)[:10]
+    best = sorted(values, key=lambda x: x[0], reverse=True)
 
     best_move = None
-    best_result = float('inf')
-
-    for _, move in values:
+    best_result = -1 * float('inf')
+    mid_vals = []
+    for _, move in best:
         next_board = current.copy()
         next_board.push(move)
         boards.append(next_board)
@@ -204,7 +203,7 @@ def lookahead_select(boards, model, history):
 
         boards.pop()
         boards.pop()
-    
+
     if best_move is not None:
         return best_move
     else:
@@ -217,8 +216,8 @@ def lookahead_select(boards, model, history):
 
 def select(boards, model, history):
     ''' calls one of the selects '''
-    move, _ = max_select(boards, model, history)
-    return move
+    return lookahead_select(boards, model, history)
+
 
 def chess_worker(connection, args):
     ''' spawns thread to play game '''
