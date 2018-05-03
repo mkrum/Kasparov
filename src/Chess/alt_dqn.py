@@ -74,7 +74,7 @@ class DQN(object):
 
         for b, r in zip(boards, rewards):
             feed = {self.rewards: r, self.inputs: b}
-            _, loss = self.sess.run((self.optimizer. self.loss), feed_dict=feed)
+            _, loss = self.sess.run((self.optimizer, self.loss), feed_dict=feed)
             losses.append(loss)
 
         return sum(losses)/len(losses)
@@ -88,7 +88,7 @@ class DQN(object):
         meta_path = '{}/.modelprog.meta'.format(path)
         if os.path.exists(meta_path):
             self.saver = tf.train.import_meta_graph(meta_path)
-            self.saver.restore(self.sess, tf.train.latest_checkpoint('./'))
+            self.saver.restore(self.sess, tf.train.latest_checkpoint(path))
         else:
             print('{} does not exist'.format(meta_path))
 
