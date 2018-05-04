@@ -25,21 +25,21 @@ def main():
         board = game.board()
 
         i = 0
+        board_to_png(board, base, i, None)
         for move in game.main_line():
-            board_to_png(board, base, i)
-            board.push(move)
             i += 1
+            board.push(move)
+            board_to_png(board, base, i, move)
 
-        board_to_png(board, base, i)
 
     if os.path.exists(TEMP):
         os.remove(TEMP)
 
 
-def board_to_png(board, base, i):
+def board_to_png(board, base, i, lastmove):
     png_filename = '{}/board{}.png'.format(base, i)
     with open(TEMP, 'w+') as temp:
-        svg_text = chess.svg.board(board=board)
+        svg_text = chess.svg.board(board=board, lastmove=lastmove)
         temp.write(svg_text)
     subprocess.run(['svgexport', TEMP, png_filename, '1024:1024'])
 
