@@ -216,8 +216,8 @@ def lookahead_select(boards, model, history):
 
 def select(boards, model, history):
     ''' calls one of the selects '''
-    return lookahead_select(boards, model, history)
-
+    move, _ = max_select(boards, model, history)
+    return move
 
 def chess_worker(connection, args):
     ''' spawns thread to play game '''
