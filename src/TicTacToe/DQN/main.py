@@ -143,8 +143,9 @@ games = 0
 gamma = 1.0
 
 EPOCH = 100
-TEST_FRQ = 50 * EPOCH
+TEST_FRQ = 100 * EPOCH
 win_rate = []
+win_rate.append(test_against_random(model))
 
 while True:
     games += 1
@@ -189,8 +190,8 @@ while True:
 
     else:
         #tie
-        one_rewards = [-.5] * len(boards[1])
-        two_rewards = [-.5] * len(boards[2])
+        one_rewards = [0] * len(boards[1])
+        two_rewards = [0] * len(boards[2])
 
         rewards = np.array(one_rewards + two_rewards)
         boards = np.concatenate([boards[1], boards[2]])
@@ -199,7 +200,7 @@ while True:
     model.train(boards, rewards)
 
     if games % EPOCH == 0:
-        gamma *= .9
+        gamma *= 1.0
         win_rate.append(test_against_random(model))
 
         debug_run(model)
@@ -210,5 +211,6 @@ while True:
         plt.ylabel('Winning Percentage')
         plt.xlabel('Epochs')
         plt.show()
+        model.save('./dqn_no/')
         exit()
-    
+
