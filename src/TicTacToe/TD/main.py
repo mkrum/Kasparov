@@ -144,8 +144,9 @@ games = 0
 gamma = 1.0
 
 EPOCH = 1000
-TEST_FRQ = 50 * EPOCH
+TEST_FRQ = 100 * EPOCH
 win_rate = []
+win_rate.append(test_against_random(model))
 lam = 0.7
 
 while True:
@@ -187,14 +188,16 @@ while True:
         rewards[(winner % 2) + 1][-1] = -1
 
     targets = {1: [], 2: []}
+    
+    targets[1] = [0] * len(rewards[1])
+    targets[1][-1] = float(rewards[1][-1])
+    for i in reversed(range(len(rewards[1]) - 1)):
+        targets[1][i] = float(lam * vals[1][i + 1])
 
-    for i in range(len(rewards[1]) - 1):
-        targets[1].append(rewards[1][i] + lam * vals[1][i + 1])
-    targets[1].append(rewards[1][-1])
-
-    for i in range(len(rewards[2]) - 1):
-        targets[2].append(rewards[2][i] + lam * vals[2][i + 1])
-    targets[2].append(rewards[2][-1])
+    targets[2] = [0] * len(rewards[2])
+    targets[2][-1] = float(rewards[2][-1])
+    for i in reversed(range(len(rewards[2]) - 1)):
+        targets[2][i] = float(lam * vals[2][i + 1])
 
     boards = np.array(boards[1] + boards[2])
     targets = np.expand_dims(np.array(targets[1] + targets[2]), 1)
@@ -202,7 +205,7 @@ while True:
     model.train(boards, targets)
 
     if games % EPOCH == 0:
-        gamma *= .9
+        gamma *= .99
         win_rate.append(test_against_random(model))
 
         debug_run(model)
@@ -213,5 +216,6 @@ while True:
         plt.ylabel('Winning Percentage')
         plt.xlabel('Epochs')
         plt.show()
+        model.save('./temp/') 
         exit()
-    
+
